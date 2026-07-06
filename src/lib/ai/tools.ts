@@ -246,5 +246,71 @@ export function getLocalTools(): Record<string, Tool> {
         return { count: data?.length ?? 0, announcements: data ?? [] };
       },
     }),
+
+    online_search: tool({
+      description:
+        "Search the web for up-to-date information, news, programming documentation, or academic answers that are not in the local database. Use when the student asks about general knowledge, current events, or coding concepts.",
+      inputSchema: z.object({
+        query: z.string().describe("The search query to look up on the web."),
+      }),
+      execute: async ({ query }) => {
+        const results = await performWebSearch(query);
+        return { count: results.length, results };
+      },
+    }),
   };
+}
+
+async function performWebSearch(query: string): Promise<any[]> {
+  try {
+    const response = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        },
+      }
+    );
+    if (!response.ok) {
+      throw new Error(`DuckDuckGo search failed with status ${response.status}`);
+    }
+    const html = await response.text();
+
+    const results: { title: string; url: string; snippet: string }[] = [];
+    const titleMatches = [
+      ...html.matchAll(/class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g),
+    ];
+    const snippetMatches = [...html.matchAll(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)];
+
+    const count = Math.min(titleMatches.length, snippetMatches.length, 5);
+    for (let i = 0; i < count; i++) {
+      const titleMatch = titleMatches[i];
+      const snippetMatch = snippetMatches[i];
+
+      let rawUrl = titleMatch[1];
+      let title = titleMatch[2].replace(/<[^>]*>/g, "").trim();
+      let snippet = snippetMatch[1].replace(/<[^>]*>/g, "").trim();
+
+      let cleanUrl = rawUrl;
+      if (rawUrl.includes("uddg=")) {
+        const uddgIndex = rawUrl.indexOf("uddg=");
+        const encodedUrl = rawUrl.substring(uddgIndex + 5).split("&")[0];
+        cleanUrl = decodeURIComponent(encodedUrl);
+      } else if (rawUrl.startsWith("//")) {
+        cleanUrl = "https:" + rawUrl;
+      }
+
+      results.push({
+        title,
+        url: cleanUrl,
+        snippet,
+      });
+    }
+
+    return results;
+  } catch (error) {
+    console.error("Web search error:", error);
+    return [];
+  }
 }
