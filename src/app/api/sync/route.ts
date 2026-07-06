@@ -4,6 +4,9 @@ import { requireOwner } from "@/lib/auth";
 import { fetchChannelMessages } from "@/lib/platforms/discord";
 import { fetchSlackMessages } from "@/lib/platforms/slack";
 import { listAnnouncements, listAssignments } from "../../../../mcp/classroom/tools";
+import { createGoogle } from "@ai-sdk/google";
+import { generateText } from "ai";
+import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
 
 // POST /api/sync — pull announcements/assignments from every connected platform
 // into the local DB cache. Owner-only (it mutates the DB). Each platform is
@@ -217,6 +220,153 @@ export async function POST(request: NextRequest) {
       });
     }
   }
+
+  // ==========================================
+  // AUTONOMOUS CONCIERGE AGENT PROCESSING LAYER
+  // ==========================================
+  try {
+    const { data: geminiPlatform } = await db
+      .from("platforms")
+      .select("access_token, is_connected")
+      .eq("type", "gemini")
+      .maybeSingle();
+
+    const apiKey =
+      geminiPlatform?.is_connected && geminiPlatform?.access_token
+        ? geminiPlatform.access_token
+        : process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      const googleProvider = createGoogle({ apiKey });
+
+      // Fetch the last 5 announcements
+      const { data: anns } = await db
+        .from("announcements")
+        .select("id, content, announced_at, platform_id")
+        .order("announced_at", { ascending: false })
+        .limit(5);
+
+      if (anns && anns.length > 0) {
+        for (const ann of anns) {
+          const { data: existingAction } = await db
+            .from("agent_actions")
+            .select("id")
+            .eq("source_id", ann.id)
+            .maybeSingle();
+
+          if (existingAction) continue;
+
+          const prompt = `You are the autonomous Nexus AI Concierge Agent. Read this university announcement and determine if there is an upcoming quiz/midterm/assignment deadline that should be scheduled on the student's calendar, or an academic study link (like a Google Drive, PDF, slides, or syllabus reference URL) that should be saved to their Resources repository.
+
+Announcement content:
+"${ann.content}"
+
+Rules:
+- Respond ONLY with a valid JSON object matching the following TypeScript type:
+{
+  hasEvent: boolean;
+  event?: {
+    title: string;
+    description: string;
+    event_type: "exam" | "quiz" | "assignment" | "other";
+    start_time: string; // ISO 8601 string, assume year is 2026 if not specified
+  };
+  hasResource: boolean;
+  resource?: {
+    title: string;
+    url: string;
+    description: string;
+  };
+}
+- Do not add markdown backticks or any wrapper, return raw JSON string.`;
+
+          const { text } = await generateText({
+            model: googleProvider("gemini-flash-lite-latest"),
+            prompt,
+          });
+
+          const cleanText = text
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
+          try {
+            const result = JSON.parse(cleanText);
+
+            if (result.hasEvent && result.event) {
+              const eventRow = {
+                title: result.event.title,
+                description: result.event.description,
+                event_type: result.event.event_type,
+                start_time: result.event.start_time,
+                source_platform: ann.platform_id,
+                source_external_id: `auto-${ann.id}`,
+                is_auto_detected: true,
+              };
+
+              const { error: evError } = await db
+                .from("events")
+                .upsert(eventRow, { onConflict: "source_platform,source_external_id" });
+
+              if (!evError) {
+                try {
+                  await writeToGoogleCalendar(
+                    result.event.title,
+                    result.event.start_time,
+                    undefined,
+                    result.event.description
+                  );
+                } catch {}
+
+                await db.from("agent_actions").insert({
+                  title: `Autoscheduled ${result.event.event_type}`,
+                  description: `Detected upcoming ${result.event.event_type} "${result.event.title}" on ${new Date(result.event.start_time).toLocaleDateString()} in announcements and scheduled it on Supabase & Google Calendar.`,
+                  action_type: "calendar",
+                  source_id: ann.id,
+                });
+              }
+            }
+
+            if (result.hasResource && result.resource) {
+              const resRow = {
+                title: result.resource.title,
+                url: result.resource.url,
+                description: result.resource.description,
+                source_platform: ann.platform_id,
+                is_pinned: true,
+              };
+
+              const { data: existingRes } = await db
+                .from("resources")
+                .select("id")
+                .eq("url", result.resource.url)
+                .maybeSingle();
+
+              if (!existingRes) {
+                const { error: resError } = await db.from("resources").insert(resRow);
+                if (!resError) {
+                  await db.from("agent_actions").insert({
+                    title: "Autosaved Resource Link",
+                    description: `Extracted study reference link "${result.resource.title}" from announcement and saved it to Resources.`,
+                    action_type: "resource",
+                    source_id: ann.id,
+                  });
+                }
+              }
+            }
+
+            if (!result.hasEvent && !result.hasResource) {
+              await db.from("agent_actions").insert({
+                title: "Concierge Announcement Scan",
+                description: `Processed announcement "${ann.content.slice(0, 50)}...". No actionable events or study links detected.`,
+                action_type: "sync",
+                source_id: ann.id,
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+  } catch {}
 
   return Response.json({ synced });
 }

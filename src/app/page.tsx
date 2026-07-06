@@ -5,6 +5,7 @@ import { UpcomingEvents } from "@/components/dashboard/upcoming-events";
 import { TodaysSchedule } from "@/components/dashboard/todays-schedule";
 import { RecentAnnouncements } from "@/components/dashboard/recent-announcements";
 import { PinnedResources } from "@/components/dashboard/pinned-resources";
+import { AgentActions } from "@/components/dashboard/agent-actions";
 import { SyncOnLoad } from "@/components/dashboard/sync-on-load";
 
 // Reads from the DB at request time, so keep it out of the build-time prerender.
@@ -40,8 +41,16 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <RecentAnnouncements items={data.recentAnnouncements} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RecentAnnouncements items={data.recentAnnouncements} />
+        </div>
+        <div>
+          <AgentActions items={data.agentActions} />
+        </div>
+      </div>
+
+      <div>
         <PinnedResources resources={data.pinnedResources} />
       </div>
     </div>

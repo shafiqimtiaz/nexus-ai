@@ -12,6 +12,7 @@ interface DbSchema {
   labels: any[];
   resources: any[];
   resource_labels: any[];
+  agent_actions: any[];
 }
 
 function getInitialData(): DbSchema {
@@ -154,6 +155,24 @@ function getInitialData(): DbSchema {
       { resource_id: "r1", label_id: "22222222-2222-2222-2222-222222222222" },
       { resource_id: "r2", label_id: "22222222-2222-2222-2222-222222222221" },
       { resource_id: "r3", label_id: "22222222-2222-2222-2222-222222222222" },
+    ],
+    agent_actions: [
+      {
+        id: "act-1",
+        title: "Concierge Sync Run",
+        description: "Scanned Google Classroom and Discord for study events.",
+        action_type: "sync",
+        source_id: null,
+        created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      },
+      {
+        id: "act-2",
+        title: "Autoscheduled Midterm",
+        description: "Ingested CS 101 Midterm announcement and added study sessions on Google Calendar.",
+        action_type: "calendar",
+        source_id: "demo-ann-1",
+        created_at: new Date(Date.now() - 3.8 * 60 * 60 * 1000).toISOString(),
+      },
     ],
   };
 }

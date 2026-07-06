@@ -28,6 +28,14 @@ export type DashboardResource = {
   description: string | null;
 };
 
+export type DashboardAgentAction = {
+  id: string;
+  title: string;
+  description: string;
+  action_type: "calendar" | "resource" | "sync" | "chat";
+  created_at: string;
+};
+
 export type DashboardData = {
   upcomingEvents: DashboardEvent[];
   todaysSchedule: DashboardEvent[];
@@ -38,6 +46,7 @@ export type DashboardData = {
   };
   recentAnnouncements: DashboardAnnouncement[];
   pinnedResources: DashboardResource[];
+  agentActions: DashboardAgentAction[];
 };
 
 const SNIPPET_LEN = 200;
@@ -67,6 +76,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     assignmentsRes,
     announcementsRes,
     resourcesRes,
+    agentActionsRes,
   ] = await Promise.all([
     db
       .from("events")
@@ -102,6 +112,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       .order("announced_at", { ascending: false, nullsFirst: false })
       .limit(5),
     db.from("resources").select("id, title, url, description").eq("is_pinned", true).limit(6),
+    db
+      .from("agent_actions")
+      .select("id, title, description, action_type, created_at")
+      .order("created_at", { ascending: false })
+      .limit(5),
   ]);
 
   const daysToNextExam = nextExamRes.data?.start_time
@@ -125,5 +140,6 @@ export async function getDashboardData(): Promise<DashboardData> {
       announced_at: a.announced_at,
     })),
     pinnedResources: (resourcesRes.data ?? []) as DashboardResource[],
+    agentActions: (agentActionsRes.data ?? []) as DashboardAgentAction[],
   };
 }
