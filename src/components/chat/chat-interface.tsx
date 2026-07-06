@@ -243,6 +243,11 @@ export function ChatInterface({ role }: { role: Role }) {
               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
               <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
               <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+              <option value="gemini-flash-latest">Gemini Flash Latest</option>
+              <option value="gemini-pro-latest">Gemini Pro Latest</option>
+              <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest</option>
+              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
             </select>
           </div>
         </div>
