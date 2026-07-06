@@ -1,76 +1,53 @@
-# Nexus — Implementation Plan
+# Nexus — Implementation Plan (24h Hackathon Cut)
 
 > **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
-**Goal:** Build Nexus — a personal AI-powered academic organizer that centralizes announcements from Discord, Slack, and Google Classroom into a single web interface with an agentic AI chat.
+> ⚠️ **This repo runs Next.js 16 with breaking changes.** Before writing any code, read the relevant guide in `node_modules/next/dist/docs/` (routing, route handlers, server components, middleware). Do not code from memory.
 
-**Architecture:** Next.js full-stack app with Supabase for persistence, Vercel AI SDK for the agentic chat, remote MCP servers for platform integrations, and shadcn/ui + Tailwind for the UI. Deployed on Vercel.
+**Goal:** Ship Nexus — personal academic organizer with agentic AI chat — submittable to the Kaggle capstone (Concierge track) by **July 6, 11:59 PM PT**.
+
+**Architecture:** Next.js full-stack app; Supabase (Postgres + Auth, RLS, server-only access); Vercel AI SDK + Gemini for the agent; in-repo MCP server for Google Classroom; Discord via bot token as in-process tool. Deployed on Vercel. Public read-only demo mode for judges.
 
 **Tech Stack:**
-- **Framework:** Next.js (App Router)
-- **UI:** shadcn/ui + Tailwind CSS
-- **Database:** Supabase (PostgreSQL)
-- **AI Agent:** Vercel AI SDK (multi-model, tool-calling)
-- **State:** React Server Components + React Query
-- **Calendar:** react-big-calendar
-- **Auth:** Native OAuth per platform (Discord, Slack, Google)
-- **Deployment:** Vercel (app) + Render/Cloudflare (MCP servers)
-- **Theme:** White / green shades / black
+- **Framework:** Next.js (App Router) — already scaffolded
+- **UI:** shadcn/ui + Tailwind CSS (white/green/black theme)
+- **Database/Auth:** Supabase (Postgres + Supabase Auth, single owner)
+- **AI Agent:** Vercel AI SDK + `@ai-sdk/google` (Gemini only, key in env)
+- **MCP:** `@modelcontextprotocol/sdk` — Classroom server in-repo, agent connects as MCP client
+- **Calendar UI:** custom lightweight grid/list (NO react-big-calendar)
+- **Deployment:** Vercel only (no Render)
+
+**Hour budget (~24h):** Phases 0–1: 3h · Phase 2: 4h · Phase 3: 4h · Phase 4: 4h · Phase 5: 2h · Phase 6 (submission assets): 5h · buffer: 2h. If behind after Phase 4, cut Phase 5 features, never Phase 6.
 
 ---
 
-## Phase 0: Project Scaffolding
+## Phase 0: Foundation (partially done)
 
-### Task 0.1: Initialize Next.js Project
+### Task 0.1: Next.js init — DONE
 
-**Files:**
-- Create: `package.json`, `next.config.js`, `tsconfig.json` (via `npx create-next-app`)
-- Create: `.env.local` (environment variables template)
-- Create: `.env.example` (documented env var reference)
-- Create: `.gitignore`
-
-**Steps:**
-1. Run `npx -y create-next-app@latest ./ --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"` 
-2. Install core dependencies:
-   ```bash
-   npm install @supabase/supabase-js @tanstack/react-query ai @ai-sdk/openai @ai-sdk/google react-big-calendar date-fns lucide-react
-   ```
-3. Install dev dependencies:
-   ```bash
-   npm install -D @types/react-big-calendar
-   ```
-4. Initialize shadcn/ui:
-   ```bash
-   npx -y shadcn@latest init
-   ```
-5. Create `.env.example` with all required env vars documented
-6. Verify: `npm run dev` starts without errors
-
-### Task 0.2: Set Up Supabase
+### Task 0.2: Supabase schema + clients
 
 **Files:**
-- Create: `src/lib/supabase/client.ts` (browser client)
-- Create: `src/lib/supabase/server.ts` (server client)
+- Create: `src/lib/supabase/server.ts` (server client, service role — **no browser client**)
 - Create: `supabase/migrations/001_initial_schema.sql`
 
 **Database Schema:**
 
 ```sql
--- Platform connections
+-- Platform connections (google_classroom uses OAuth tokens; discord stores bot token in access_token)
 CREATE TABLE platforms (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  type TEXT NOT NULL CHECK (type IN ('discord', 'slack', 'google_classroom')),
+  type TEXT NOT NULL UNIQUE CHECK (type IN ('google_classroom', 'discord')),
   name TEXT NOT NULL,
-  channel_url TEXT NOT NULL,
+  external_id TEXT,                -- Classroom course id / Discord channel id
   access_token TEXT,
   refresh_token TEXT,
   token_expires_at TIMESTAMPTZ,
   is_connected BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Calendar events
 CREATE TABLE events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -78,14 +55,13 @@ CREATE TABLE events (
   event_type TEXT NOT NULL CHECK (event_type IN ('exam', 'quiz', 'assignment', 'study_block', 'other')),
   start_time TIMESTAMPTZ NOT NULL,
   end_time TIMESTAMPTZ,
-  color TEXT,
-  google_calendar_id TEXT,
   source_platform UUID REFERENCES platforms(id),
+  source_external_id TEXT,         -- for dedup of auto-detected events
   is_auto_detected BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (source_platform, source_external_id)
 );
 
--- Resources (links only)
 CREATE TABLE resources (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
@@ -96,322 +72,211 @@ CREATE TABLE resources (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Resource labels
 CREATE TABLE labels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   color TEXT
 );
 
--- Many-to-many: resources <-> labels
 CREATE TABLE resource_labels (
   resource_id UUID REFERENCES resources(id) ON DELETE CASCADE,
   label_id UUID REFERENCES labels(id) ON DELETE CASCADE,
   PRIMARY KEY (resource_id, label_id)
 );
 
--- Cached announcements
 CREATE TABLE announcements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   platform_id UUID REFERENCES platforms(id),
+  external_id TEXT NOT NULL,       -- platform message/announcement id for dedup
   title TEXT,
   content TEXT NOT NULL,
   author TEXT,
   source_url TEXT,
   is_read BOOLEAN DEFAULT false,
   announced_at TIMESTAMPTZ,
-  fetched_at TIMESTAMPTZ DEFAULT now()
+  fetched_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (platform_id, external_id)
 );
 
--- App settings
-CREATE TABLE settings (
-  key TEXT PRIMARY KEY,
-  value JSONB NOT NULL
-);
+-- RLS: deny everything to anon/authenticated; app uses service role server-side only
+ALTER TABLE platforms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE labels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resource_labels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE announcements ENABLE ROW LEVEL SECURITY;
+-- no policies created = deny all except service role
 ```
 
 **Steps:**
-1. Create Supabase project at supabase.com
-2. Run the migration SQL in Supabase dashboard
-3. Create `client.ts` and `server.ts` with Supabase SDK setup
-4. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local`
-5. Verify: Query the `settings` table from a test API route
+1. Run migration in Supabase dashboard
+2. `server.ts`: service-role client, `import 'server-only'` guard so it can never be bundled client-side
+3. Env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (NOT `NEXT_PUBLIC_*`), document in `.env.example`
+4. Verify: test API route reads `platforms` table
 
-### Task 0.3: Set Up Design System & Layout
+### Task 0.3: Auth + demo mode + layout
 
 **Files:**
-- Create: `src/app/globals.css` (theme tokens — white/green/black palette)
-- Create: `src/app/layout.tsx` (root layout with sidebar navigation)
-- Create: `src/components/layout/sidebar.tsx`
-- Create: `src/components/layout/header.tsx`
-- Create: `src/components/providers.tsx` (React Query provider)
+- Create: `src/proxy.ts` (session check — Next 16 renamed `middleware.ts` → `proxy.ts`, export `function proxy(request)`)
+- Create: `src/app/login/page.tsx`
+- Create: `src/lib/auth.ts` (`getSession()` helper → `{ role: 'owner' | 'demo' }`)
+- Create: `src/app/layout.tsx`, `src/components/layout/sidebar.tsx`, `src/components/layout/header.tsx`
+- Create: `supabase/seed.sql` (demo data: sample announcements, events, resources)
 
 **Steps:**
-1. Configure Tailwind with custom green/black/white palette
-2. Install shadcn components: `button`, `card`, `input`, `dialog`, `badge`, `toast`, `tabs`, `separator`, `avatar`, `scroll-area`
-3. Build sidebar with navigation links: Dashboard, Calendar, Resources, AI Chat, Options
-4. Build header with app name "Nexus" and status indicators
-5. Wrap app in React Query provider
-6. Verify: App renders with sidebar navigation, all routes navigable
+1. Enable Supabase Auth (email/password), create the single owner account manually; disable signups
+2. `getSession()`: authenticated owner → full access; unauthenticated → `demo` role
+3. Demo role: all pages render (read-only), every mutation route returns 403, chat disabled with banner "Demo mode — watch the video for the agent in action"; demo banner in header with login link
+4. Sidebar: Dashboard, Calendar, Resources, AI Chat, Options; green/black/white theme; shadcn components: `button card input dialog badge tabs skeleton`
+5. Verify: logged out → read-only demo with seeded data; logged in → full access
 
 ---
 
-## Phase 1: AI Chat + Options (MVP Core)
+## Phase 1: Options + Platform Connections
 
-> This is the product. Ship this first.
-
-### Task 1.1: Options Page — Platform Connection UI
+### Task 1.1: Options page
 
 **Files:**
 - Create: `src/app/options/page.tsx`
 - Create: `src/components/options/platform-card.tsx`
-- Create: `src/components/options/api-key-form.tsx`
-- Create: `src/app/api/platforms/route.ts` (CRUD for platform connections)
+- Create: `src/app/api/platforms/route.ts`
 
 **Steps:**
-1. Build Options page with 3 platform cards (Discord, Slack, Google Classroom)
-2. Each card shows: platform icon, name, connection status, connect/disconnect button, channel URL input
-3. Build API key configuration form (LLM provider selector + API key input)
-4. Store platform configs and API key in Supabase `platforms` and `settings` tables
-5. Verify: Can save/load platform configs and API key from database
+1. Two platform cards: Google Classroom (Connect via Google button), Discord (bot token + channel ID form)
+2. Show connection status + `last_synced_at`; disconnect button wipes tokens
+3. Discord card: POST token+channel to server, server validates with a test API call (`GET /channels/{id}`) before saving
+4. Verify: Discord connect with a real bot token shows "Connected"
 
-### Task 1.2: OAuth Flows for Each Platform
+### Task 1.2: Google OAuth (Classroom scopes)
 
 **Files:**
-- Create: `src/app/api/auth/discord/route.ts` (Discord OAuth2 redirect)
-- Create: `src/app/api/auth/discord/callback/route.ts`
-- Create: `src/app/api/auth/slack/route.ts` (Slack OAuth redirect)
-- Create: `src/app/api/auth/slack/callback/route.ts`
-- Create: `src/app/api/auth/google/route.ts` (Google OAuth for Classroom)
-- Create: `src/app/api/auth/google/callback/route.ts`
-- Create: `src/lib/auth/oauth-helpers.ts` (shared OAuth utilities)
+- Create: `src/app/api/auth/google/route.ts` + `src/app/api/auth/google/callback/route.ts`
+- Create: `src/lib/auth/google-oauth.ts` (token exchange + refresh)
 
 **Steps:**
-1. Register OAuth apps on Discord Developer Portal, Slack API, Google Cloud Console
-2. Implement OAuth2 authorization code flow for each platform
-3. Store tokens securely in Supabase `platforms` table
-4. Handle token refresh logic
-5. Update connection status on successful auth
-6. Verify: Can connect each platform via OAuth and see "Connected" status
-
-### Task 1.3: MCP Server — Google Classroom
-
-**Files:**
-- Create: `mcp-servers/google-classroom/index.ts`
-- Create: `mcp-servers/google-classroom/tools.ts`
-- Create: `mcp-servers/google-classroom/package.json`
-
-**Tools exposed:**
-- `list_announcements` — fetch announcements from a class
-- `list_assignments` — fetch assignments with due dates
-- `list_materials` — fetch course materials and resource links
-- `get_class_info` — fetch class details
-
-**Steps:**
-1. Build MCP server using `@modelcontextprotocol/sdk`
-2. Use Google Classroom API via the stored OAuth token
-3. Expose tools for announcements, assignments, materials
-4. Deploy to Render (free tier)
-5. Verify: MCP server responds to tool calls with real Classroom data
-
-### Task 1.4: MCP Server — Discord
-
-**Files:**
-- Create: `mcp-servers/discord/index.ts`
-- Create: `mcp-servers/discord/tools.ts`
-- Create: `mcp-servers/discord/package.json`
-
-**Tools exposed:**
-- `list_messages` — fetch recent messages from a channel
-- `list_pinned_messages` — fetch pinned messages
-- `search_messages` — search messages by keyword
-
-**Steps:**
-1. Build MCP server using `@modelcontextprotocol/sdk`
-2. Use Discord API via stored OAuth token
-3. Deploy to Render (free tier)
-4. Verify: MCP server responds with real Discord channel data
-
-### Task 1.5: MCP Server — Slack
-
-**Files:**
-- Create: `mcp-servers/slack/index.ts`
-- Create: `mcp-servers/slack/tools.ts`
-- Create: `mcp-servers/slack/package.json`
-
-**Tools exposed:**
-- `list_messages` — fetch recent messages from a channel
-- `list_pinned_messages` — fetch pinned messages
-- `search_messages` — search messages by keyword
-
-**Steps:**
-1. Build MCP server using `@modelcontextprotocol/sdk`
-2. Use Slack Web API via stored OAuth token
-3. Deploy to Render (free tier)
-4. Verify: MCP server responds with real Slack channel data
-
-### Task 1.6: AI Agent Chat — Core
-
-**Files:**
-- Create: `src/app/chat/page.tsx`
-- Create: `src/components/chat/chat-interface.tsx`
-- Create: `src/components/chat/message-bubble.tsx`
-- Create: `src/components/chat/tool-call-display.tsx`
-- Create: `src/app/api/chat/route.ts` (Vercel AI SDK streaming endpoint)
-- Create: `src/lib/ai/tools.ts` (tool definitions)
-- Create: `src/lib/ai/system-prompt.ts`
-
-**Agent Tools:**
-| Tool | Description |
-|------|-------------|
-| `summarize_announcements` | Fetches and summarizes announcements from connected platforms via MCP |
-| `create_event` | Creates a calendar event in Supabase + pushes to Google Calendar |
-| `edit_event` | Modifies an existing calendar event |
-| `search_resources` | Searches saved resource links by title/label |
-| `add_resource` | Saves a new resource link |
-| `set_reminder` | Creates a study reminder event |
-| `generate_study_plan` | Creates a multi-day study plan based on upcoming exams |
-| `get_upcoming_events` | Fetches upcoming exams/quizzes/assignments |
-
-**Steps:**
-1. Build chat UI with message list, input box, and streaming response display
-2. Build tool-call display component (shows when agent uses a tool)
-3. Create Vercel AI SDK route with `streamText` and tool definitions
-4. Wire tools to MCP server calls and Supabase queries
-5. Build system prompt with context about the student's connected platforms
-6. Verify: Can chat with agent, agent calls tools, results stream back
-
-### Task 1.7: Google Calendar Push
-
-**Files:**
-- Create: `src/lib/google-calendar/push.ts`
-- Modify: `src/app/api/auth/google/route.ts` (add Calendar scope)
-
-**Steps:**
-1. Add Google Calendar API scope to OAuth flow
-2. Implement `pushEvent()` function that creates events via Google Calendar API
-3. Call `pushEvent()` whenever a new event is created (from chat or calendar page)
-4. Verify: Events created in Nexus appear in Google Calendar
+1. Google Cloud Console: OAuth client, redirect URIs (localhost + Vercel domain), scopes: `classroom.courses.readonly`, `classroom.announcements.readonly`, `classroom.coursework.me.readonly`, `classroom.courseworkmaterials.readonly`; add owner as test user (unverified app is fine)
+2. Authorization code flow with `access_type=offline&prompt=consent` (need refresh token)
+3. Store tokens in `platforms`; implement refresh-on-expiry helper used by all Classroom calls
+4. After connect: list courses, let user pick one → save as `external_id`
+5. Verify: connect flow completes, course picked, tokens stored
 
 ---
 
-## Phase 2: Dashboard
+## Phase 2: MCP Server + Ingestion
 
-### Task 2.1: Dashboard Page
-
-**Files:**
-- Create: `src/app/page.tsx` (dashboard is the landing page)
-- Create: `src/components/dashboard/upcoming-events.tsx`
-- Create: `src/components/dashboard/todays-schedule.tsx`
-- Create: `src/components/dashboard/quick-stats.tsx`
-- Create: `src/components/dashboard/pinned-resources.tsx`
-- Create: `src/components/dashboard/recent-announcements.tsx`
-- Create: `src/components/dashboard/ai-tip.tsx`
-- Create: `src/app/api/dashboard/route.ts` (aggregated data endpoint)
-
-**Steps:**
-1. Build dashboard API route that aggregates data from all tables
-2. Build each widget component with loading states
-3. Layout widgets in a responsive grid (primary widgets top, secondary bottom)
-4. Upcoming Events: query `events` table for next 7 days, show countdown
-5. Today's Schedule: query `events` table for today
-6. Quick Stats: compute days-to-next-exam, unread announcements count
-7. Pinned Resources: query `resources` where `is_pinned = true`
-8. Recent Announcements: query last 5 `announcements`
-9. AI Tip: generate a daily tip via LLM on page load (cached for the day)
-10. Verify: Dashboard loads with real data from all widgets
-
----
-
-## Phase 3: Calendar
-
-### Task 3.1: Calendar Page
+### Task 2.1: Google Classroom MCP server (in-repo)
 
 **Files:**
-- Create: `src/app/calendar/page.tsx`
-- Create: `src/components/calendar/calendar-view.tsx`
-- Create: `src/components/calendar/event-form.tsx`
-- Create: `src/components/calendar/event-detail.tsx`
-- Create: `src/app/api/events/route.ts` (CRUD for events)
+- Create: `mcp/classroom/server.ts` (MCP server via `@modelcontextprotocol/sdk`)
+- Create: `mcp/classroom/tools.ts`
+- Create: `src/lib/ai/mcp-client.ts` (AI SDK connects to it)
+
+**Tools exposed:** `list_announcements`, `list_assignments`, `list_materials`, `get_class_info`
 
 **Steps:**
-1. Set up react-big-calendar with monthly/weekly/daily views
-2. Fetch events from Supabase and display with color coding by type
-3. Build event creation dialog (title, type, date/time, description)
-4. Build event detail popover on click
-5. On event create/edit: save to Supabase + push to Google Calendar
-6. Verify: Can create, view, and edit events; events appear in Google Calendar
+1. MCP server with the four tools hitting the Classroom REST API; reads OAuth token via the refresh helper (same process — no network token hand-off)
+2. Run in-repo: stdio transport spawned by the Next.js backend (or HTTP transport on an internal route) — pick whichever the AI SDK's MCP client (`experimental_createMCPClient` or current equivalent — check installed `ai` pkg docs) supports cleanly
+3. Verify: script calls `list_announcements` through the MCP client, real Classroom data returns
 
----
-
-## Phase 4: Resources
-
-### Task 4.1: Resources Page
+### Task 2.2: Discord tool + sync endpoint
 
 **Files:**
-- Create: `src/app/resources/page.tsx`
-- Create: `src/components/resources/resource-card.tsx`
-- Create: `src/components/resources/resource-form.tsx`
-- Create: `src/components/resources/label-filter.tsx`
-- Create: `src/app/api/resources/route.ts` (CRUD for resources)
-- Create: `src/app/api/labels/route.ts` (CRUD for labels)
+- Create: `src/lib/platforms/discord.ts` (fetch channel messages + pins via bot token)
+- Create: `src/app/api/sync/route.ts`
 
 **Steps:**
-1. Build resource list view with cards showing title, URL, labels, pin status
-2. Build label filter sidebar/bar to filter by label
-3. Build "Add Resource" form (title, URL, description, labels)
-4. Implement search across resource titles and labels
-5. Pin/unpin toggle that syncs with dashboard
-6. Verify: Can add, search, filter, and pin resources
+1. Discord REST: `GET /channels/{id}/messages?limit=50`, `GET /channels/{id}/pins` with `Authorization: Bot <token>` (bot must be invited to server with Message Content intent enabled — document in README)
+2. `/api/sync`: skip if `last_synced_at` < 15 min (unless `?force=1`); else pull Classroom announcements+assignments (via MCP tools) and Discord messages; upsert `announcements` on `(platform_id, external_id)`; upsert assignment due dates into `events` as `is_auto_detected` on `(source_platform, source_external_id)`; update `last_synced_at`
+3. Dashboard triggers sync fire-and-forget on load; "Sync now" button forces
+4. Verify: sync twice → no duplicates; assignments appear as events
 
 ---
 
-## Phase 5: Polish & Deploy
+## Phase 3: AI Agent Chat
 
-### Task 5.1: UI Polish
+### Task 3.1: Chat core
+
+**Files:**
+- Create: `src/app/chat/page.tsx`, `src/components/chat/chat-interface.tsx`, `src/components/chat/tool-call-display.tsx`
+- Create: `src/app/api/chat/route.ts` (AI SDK `streamText`, Gemini)
+- Create: `src/lib/ai/tools.ts`, `src/lib/ai/system-prompt.ts`
+
+**Agent tools:**
+| Tool | Backing |
+|------|---------|
+| `summarize_announcements` | reads synced `announcements` (+ live MCP fetch when asked) |
+| `get_upcoming_events` / `create_event` / `edit_event` | Supabase `events` |
+| `search_resources` / `add_resource` | Supabase `resources` |
+| `generate_study_plan` | reads upcoming exams → creates `study_block` events |
+| `set_reminder` | creates reminder event |
+| Classroom MCP tools | attached via MCP client (this is the scored MCP integration) |
 
 **Steps:**
-1. Add loading skeletons for all pages
-2. Add empty states with helpful messaging
-3. Ensure responsive layout works on tablet
-4. Add micro-animations and hover effects
-5. Finalize the white/green/black color palette across all components
-6. Add error boundaries and toast notifications for failures
-
-### Task 5.2: Deployment
-
-**Steps:**
-1. Push to GitHub repository
-2. Connect repo to Vercel, configure environment variables
-3. Deploy MCP servers to Render (one service per platform)
-4. Configure OAuth redirect URLs for production domain
-5. Verify: Full app works on production URL end-to-end
+1. `/api/chat`: `streamText` with Gemini (`GOOGLE_GENERATIVE_AI_API_KEY` env), tools above + MCP client tools, multi-step tool calling enabled
+2. System prompt: student context, connected platforms, today's date, tool usage guidance
+3. Chat UI: streaming messages, visible tool-call chips (judges must SEE agentic behavior)
+4. Owner-only (403 in demo mode)
+5. Verify: "summarize my announcements" → MCP tool call visible → summary; "create an exam event Friday" → appears in calendar
 
 ---
 
-## Build Order Summary
+## Phase 4: Dashboard
+
+### Task 4.1: Dashboard page
+
+**Files:**
+- Create: `src/app/page.tsx` + `src/components/dashboard/{upcoming-events,todays-schedule,quick-stats,recent-announcements,pinned-resources}.tsx`
+- Create: `src/app/api/dashboard/route.ts`
+
+**Steps:**
+1. Server component renders cached data instantly; client triggers `/api/sync` in background, refreshes on completion
+2. Widgets: next-7-days exams/quizzes w/ countdown; today's events; stats (days to next exam, unread count); last 5 announcements; pinned resources
+3. Responsive grid, skeletons, empty states
+4. Verify: real synced data in all widgets; demo mode shows seeded data
+
+---
+
+## Phase 5: Calendar + Resources (cuttable if behind)
+
+### Task 5.1: Calendar page
+- `src/app/calendar/page.tsx`, `src/components/calendar/{month-grid,event-form}.tsx`, `src/app/api/events/route.ts`
+- Custom month grid (CSS grid, 42 cells) + upcoming list; color-coded by type; create/edit dialog
+- Verify: manual + agent-created + auto-detected events all render
+
+### Task 5.2: Resources page
+- `src/app/resources/page.tsx`, `src/components/resources/{resource-card,resource-form,label-filter}.tsx`, `src/app/api/resources/route.ts`
+- Card list, add/edit form with labels, label filter, title/label search, pin toggle
+- Verify: add, filter, search, pin → shows on dashboard
+
+---
+
+## Phase 6: Submission Assets (NEVER cut — ~5h)
+
+### Task 6.1: Deploy
+1. Secret scan: `git log -p | grep -iE 'api[_-]?key|secret|token'` — nothing committed (hard rubric rule)
+2. Vercel: connect repo, set env vars, deploy; update Google OAuth redirect URI to prod domain
+3. Seed demo data in prod; verify logged-out URL shows demo mode with **no login required** (rubric requirement)
+4. E2E on prod: login → connect platforms → sync → chat with tool calls → dashboard populated
+
+### Task 6.2: README (20 pts)
+Problem, solution, architecture diagram (data-flow from spec §8), rubric-concept mapping table, setup instructions (env vars, Supabase migration, Discord bot invite w/ Message Content intent, Google OAuth setup), deploy reproduction steps. Code comments on design/behavior per rubric.
+
+### Task 6.3: Video (≤5 min, YouTube) + Writeup (≤2,500 words)
+Video: problem (30s) → why agents (30s) → architecture (60s) → live demo: connect, sync, chat w/ visible MCP tool calls, dashboard (2.5min) → build story incl. **Antigravity workflow on screen** (30s).
+Writeup: Kaggle Writeup, Concierge track, cover image, video + project link + repo link attached. **Submit before 11:59 PM PT — drafts don't count.**
+
+---
+
+## Build Order
 
 ```
-Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5
-Scaffold     AI Chat     Dashboard   Calendar    Resources   Polish
-             + Options                                       + Deploy
-             (MVP CORE)
+Phase 0 ──► 1 ──► 2 ──► 3 ──► 4 ──► 5 ──► 6
+Auth/DB   Options  MCP+  Agent  Dash  Cal/Res  Deploy+
++ demo    +OAuth   Sync  Chat         (cuttable) Writeup+Video
 ```
 
-**MVP ships after Phase 1.** Everything else is additive.
+**Demo-critical path:** Options → connect Classroom → sync → chat agent calls MCP tools → dashboard. Everything else supports it.
 
----
-
-## Verification Plan
-
-### After Each Phase
-- `npm run build` — must pass with zero errors
-- `npm run lint` — must pass with zero warnings
-- Manual test of all new features in browser
-
-### End-to-End Verification
-1. Connect at least one platform (Google Classroom recommended for easiest testing)
-2. Ask AI agent to summarize announcements — verify it calls MCP tools
-3. Ask AI agent to create a calendar event — verify it appears in calendar and Google Calendar
-4. Add a resource link — verify it appears on Resources page and can be pinned to Dashboard
-5. Check Dashboard — verify all widgets populate with real data
+## Verification
+- After each phase: `npm run build` clean + manual browser test
+- E2E: connect Classroom + Discord → sync → agent summarizes (MCP call visible) → agent creates event → dashboard + calendar show it → logged-out demo mode works with no login
