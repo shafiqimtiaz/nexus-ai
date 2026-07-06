@@ -320,17 +320,35 @@ export function ChatInterface({ role }: { role: Role }) {
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
             disabled={busy}
-            className="h-10 w-44 shrink-0 cursor-pointer rounded-md border border-border bg-transparent px-2 text-xs font-medium text-foreground transition-colors hover:border-border-dark focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-75"
+            className="h-10 w-44 shrink-0 cursor-pointer rounded-md border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:border-border-dark focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-75"
           >
-            <option value="gemini-flash-lite-latest">Gemini Lite (Default)</option>
-            <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-            <option value="gemini-flash-latest">Gemini Flash</option>
-            <option value="gemini-pro-latest">Gemini Pro</option>
-            <option value="gemini-3.1-flash-lite">Gemini 3.1 Lite</option>
-            <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+            <option value="gemini-flash-lite-latest" className="bg-card text-foreground">
+              Gemini Lite (Default)
+            </option>
+            <option value="gemini-2.5-flash" className="bg-card text-foreground">
+              Gemini 2.5 Flash
+            </option>
+            <option value="gemini-2.5-pro" className="bg-card text-foreground">
+              Gemini 2.5 Pro
+            </option>
+            <option value="gemini-1.5-flash" className="bg-card text-foreground">
+              Gemini 1.5 Flash
+            </option>
+            <option value="gemini-1.5-pro" className="bg-card text-foreground">
+              Gemini 1.5 Pro
+            </option>
+            <option value="gemini-flash-latest" className="bg-card text-foreground">
+              Gemini Flash
+            </option>
+            <option value="gemini-pro-latest" className="bg-card text-foreground">
+              Gemini Pro
+            </option>
+            <option value="gemini-3.1-flash-lite" className="bg-card text-foreground">
+              Gemini 3.1 Lite
+            </option>
+            <option value="gemini-3.5-flash" className="bg-card text-foreground">
+              Gemini 3.5 Flash
+            </option>
           </select>
         )}
         <Input
