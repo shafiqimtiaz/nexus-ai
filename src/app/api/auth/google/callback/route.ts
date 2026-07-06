@@ -36,7 +36,10 @@ export async function GET(request: NextRequest) {
       headers: { Authorization: `Bearer ${tokens.access_token}` },
     });
     if (!coursesRes.ok) {
-      return NextResponse.redirect(optionsUrl("error=courses"));
+      return Response.json(
+        { error: "Failed to fetch courses from Google Classroom API", status: coursesRes.status },
+        { status: 500 }
+      );
     }
 
     const coursesData = (await coursesRes.json()) as {
@@ -46,7 +49,10 @@ export async function GET(request: NextRequest) {
     // TODO: let user choose course — MVP grabs the first active course.
     const course = coursesData.courses?.[0];
     if (!course) {
-      return NextResponse.redirect(optionsUrl("error=nocourse"));
+      return Response.json(
+        { error: "No active Google Classroom courses found on your Google Account" },
+        { status: 400 }
+      );
     }
 
     const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
@@ -68,7 +74,13 @@ export async function GET(request: NextRequest) {
     );
 
     if (error) {
-      return NextResponse.redirect(optionsUrl("error=save"));
+      return Response.json(
+        {
+          error: "Failed to save Google Classroom credentials to database",
+          details: error.message,
+        },
+        { status: 500 }
+      );
     }
 
     // Successfully connected! Automatically log the user in.
@@ -79,7 +91,10 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.redirect(optionsUrl("connected=classroom"));
-  } catch {
-    return NextResponse.redirect(optionsUrl("error=oauth"));
+  } catch (error: any) {
+    return Response.json(
+      { error: error.message || "Unknown OAuth error occurred" },
+      { status: 500 }
+    );
   }
 }
