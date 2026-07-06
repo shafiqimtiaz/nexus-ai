@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Send, Loader2, Sparkles } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Send, Loader2, Sparkles, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -99,11 +100,29 @@ async function readUiStream(
 }
 
 export function ChatInterface({ role }: { role: Role }) {
+  const router = useRouter();
   const isDemo = role === "demo";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function checkKey() {
+      try {
+        const res = await fetch("/api/platforms");
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const hasUserKey = data.platforms?.some((p: any) => p.type === "gemini" && p.is_connected);
+        setHasKey(!!data.hasGlobalGeminiKey || !!hasUserKey);
+      } catch {
+        setHasKey(false);
+      }
+    }
+    checkKey();
+  }, []);
 
   // Mutate the last (assistant) message in place via functional update.
   const updateAssistant = (mutate: (m: ChatMessage) => void) => {
@@ -156,6 +175,7 @@ export function ChatInterface({ role }: { role: Role }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, content: m.content })),
+          model: selectedModel,
         }),
       });
 
@@ -204,42 +224,93 @@ export function ChatInterface({ role }: { role: Role }) {
         </div>
       )}
 
-      <div
-        ref={scrollRef}
-        className="flex-1 space-y-4 overflow-y-auto rounded-lg border bg-card p-4"
-      >
-        {messages.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-            <Sparkles className="h-8 w-8" />
-            <p className="text-sm">
-              Ask Nexus about your upcoming exams, plan a study schedule, or summarize recent
-              announcements.
+      {!isDemo && hasKey && (
+        <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border bg-card p-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              AI Assistant Online
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Model:</span>
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:border-border transition-colors"
+            >
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Default)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {hasKey === null && (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {!hasKey && hasKey !== null && (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg bg-card shadow-sm space-y-4">
+          <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+            <Key className="h-6 w-6" />
+          </div>
+          <div className="max-w-md space-y-2">
+            <h3 className="text-lg font-semibold tracking-tight">Gemini API Key Required</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              The AI Chat requires a Gemini API Key to function. Please go to the **Options** page
+              to connect Google Gemini, or configure the `GEMINI_API_KEY` environment variable on
+              your server.
             </p>
           </div>
-        )}
+          <Button onClick={() => router.push("/options")} className="cursor-pointer">
+            Configure API Key
+          </Button>
+        </div>
+      )}
 
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
-          >
-            <div
-              className={cn(
-                "max-w-[80%] rounded-lg px-3 py-2 text-sm",
-                m.role === "user" ? "bg-green-600 text-white" : "bg-muted text-foreground"
-              )}
-            >
-              {m.role === "assistant" &&
-                m.toolCalls.map((call) => <ToolCallDisplay key={call.toolCallId} call={call} />)}
-              {m.content ? (
-                <p className="whitespace-pre-wrap break-words">{m.content}</p>
-              ) : m.role === "assistant" && busy ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
+      {hasKey && (
+        <div
+          ref={scrollRef}
+          className="flex-1 space-y-4 overflow-y-auto rounded-lg border bg-card p-4"
+        >
+          {messages.length === 0 && (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+              <Sparkles className="h-8 w-8" />
+              <p className="text-sm">
+                Ask Nexus about your upcoming exams, plan a study schedule, or summarize recent
+                announcements.
+              </p>
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
+            >
+              <div
+                className={cn(
+                  "max-w-[80%] rounded-lg px-3 py-2 text-sm",
+                  m.role === "user" ? "bg-green-600 text-white" : "bg-muted text-foreground"
+                )}
+              >
+                {m.role === "assistant" &&
+                  m.toolCalls.map((call) => <ToolCallDisplay key={call.toolCallId} call={call} />)}
+                {m.content ? (
+                  <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                ) : m.role === "assistant" && busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <form
         className="mt-4 flex gap-2"
@@ -251,10 +322,12 @@ export function ChatInterface({ role }: { role: Role }) {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={isDemo ? "Log in to chat with Nexus" : "Message Nexus…"}
-          disabled={isDemo || busy}
+          placeholder={
+            isDemo ? "Log in to chat with Nexus" : !hasKey ? "API Key required" : "Message Nexus…"
+          }
+          disabled={isDemo || busy || !hasKey}
         />
-        <Button type="submit" disabled={isDemo || busy || !input.trim()}>
+        <Button type="submit" disabled={isDemo || busy || !input.trim() || !hasKey}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
         </Button>
       </form>

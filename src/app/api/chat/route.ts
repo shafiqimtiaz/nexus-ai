@@ -12,8 +12,7 @@ import { createServerClient } from "@/lib/supabase/server";
 // call. Multi-step (stopWhen: stepCountIs(8)) so the model can call tools and
 // then answer in the same turn. Streams back the AI SDK UI message protocol.
 
-// Single model constant — swap here to change the model everywhere.
-const MODEL = "gemini-2.5-flash";
+const ALLOWED_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"];
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
@@ -25,6 +24,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   const messages = body?.messages as ModelMessage[] | undefined;
+  const requestedModel = body?.model as string | undefined;
+
+  const modelName =
+    requestedModel && ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "gemini-2.5-flash";
 
   if (!Array.isArray(messages)) {
     return Response.json({ error: "messages must be an array" }, { status: 400 });
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
   });
 
   const result = streamText({
-    model: googleProvider(MODEL),
+    model: googleProvider(modelName),
     system: buildSystemPrompt(),
     messages,
     tools,

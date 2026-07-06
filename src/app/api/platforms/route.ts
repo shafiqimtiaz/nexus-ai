@@ -31,6 +31,9 @@ export async function GET() {
     hasGlobalGoogleOauth: !!(
       process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET
     ),
+    hasGlobalGeminiKey: !!(
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
+    ),
   });
 }
 
