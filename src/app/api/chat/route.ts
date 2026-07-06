@@ -13,13 +13,9 @@ import { createServerClient } from "@/lib/supabase/server";
 // then answer in the same turn. Streams back the AI SDK UI message protocol.
 
 const ALLOWED_MODELS = [
-  "gemini-2.5-flash",
-  "gemini-2.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-pro",
+  "gemini-flash-lite-latest",
   "gemini-flash-latest",
   "gemini-pro-latest",
-  "gemini-flash-lite-latest",
   "gemini-3.1-flash-lite",
   "gemini-3.5-flash",
 ];

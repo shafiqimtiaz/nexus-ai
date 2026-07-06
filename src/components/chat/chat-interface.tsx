@@ -325,18 +325,6 @@ export function ChatInterface({ role }: { role: Role }) {
             <option value="gemini-flash-lite-latest" className="bg-card text-foreground">
               Gemini Lite (Default)
             </option>
-            <option value="gemini-2.5-flash" className="bg-card text-foreground">
-              Gemini 2.5 Flash
-            </option>
-            <option value="gemini-2.5-pro" className="bg-card text-foreground">
-              Gemini 2.5 Pro
-            </option>
-            <option value="gemini-1.5-flash" className="bg-card text-foreground">
-              Gemini 1.5 Flash
-            </option>
-            <option value="gemini-1.5-pro" className="bg-card text-foreground">
-              Gemini 1.5 Pro
-            </option>
             <option value="gemini-flash-latest" className="bg-card text-foreground">
               Gemini Flash
             </option>
