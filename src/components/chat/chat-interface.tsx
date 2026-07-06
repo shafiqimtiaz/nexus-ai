@@ -106,7 +106,7 @@ export function ChatInterface({ role }: { role: Role }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
+  const [selectedModel, setSelectedModel] = useState("gemini-flash-lite-latest");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -239,13 +239,13 @@ export function ChatInterface({ role }: { role: Role }) {
               onChange={(e) => setSelectedModel(e.target.value)}
               className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:border-border transition-colors"
             >
-              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Default)</option>
+              <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest (Default)</option>
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
               <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
               <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
               <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
               <option value="gemini-flash-latest">Gemini Flash Latest</option>
               <option value="gemini-pro-latest">Gemini Pro Latest</option>
-              <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest</option>
               <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
               <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
             </select>

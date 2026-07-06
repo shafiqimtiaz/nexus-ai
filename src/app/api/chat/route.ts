@@ -37,7 +37,9 @@ export async function POST(request: NextRequest) {
   const requestedModel = body?.model as string | undefined;
 
   const modelName =
-    requestedModel && ALLOWED_MODELS.includes(requestedModel) ? requestedModel : "gemini-2.5-flash";
+    requestedModel && ALLOWED_MODELS.includes(requestedModel)
+      ? requestedModel
+      : "gemini-flash-lite-latest";
 
   if (!Array.isArray(messages)) {
     return Response.json({ error: "messages must be an array" }, { status: 400 });
