@@ -358,6 +358,7 @@ export function ChatInterface({ role }: { role: Role }) {
             isDemo ? "Log in to chat with Nexus" : !hasKey ? "API Key required" : "Message Nexus…"
           }
           disabled={isDemo || busy || !hasKey}
+          className="h-10"
         />
         <Button type="submit" disabled={isDemo || busy || !input.trim() || !hasKey}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
