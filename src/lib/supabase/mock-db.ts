@@ -177,20 +177,14 @@ function loadDb(): DbSchema {
 }
 
 function saveDb(db: DbSchema) {
-  const dir = path.dirname(LOCAL_DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  
   const serialized = JSON.stringify(db, null, 2);
   
-  // Try writing locally first (persists in project directory)
+  // Write only to /tmp to prevent writing sensitive credentials back into the Git-tracked db.json file
   try {
-    fs.writeFileSync(LOCAL_DB_PATH, serialized, "utf8");
-  } catch {}
-  
-  // Always write to /tmp for serverless runtime compatibility
-  try {
+    const dir = path.dirname(TMP_DB_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(TMP_DB_PATH, serialized, "utf8");
   } catch {}
 }
