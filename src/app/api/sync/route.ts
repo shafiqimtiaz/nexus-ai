@@ -29,6 +29,7 @@ interface PlatformRow {
   type: "google_classroom" | "discord" | "slack";
   external_id: string | null;
   access_token: string | null;
+  refresh_token: string | null;
   last_synced_at: string | null;
 }
 
@@ -112,7 +113,7 @@ async function syncDiscord(
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
   if (!platform.access_token || !platform.external_id) {
-    throw new Error("Discord platform is missing its bot token or channel ID.");
+    throw new Error("Discord platform is missing its user token or channel ID.");
   }
 
   const messages = await fetchChannelMessages(platform.access_token, platform.external_id);
@@ -137,11 +138,15 @@ async function syncSlack(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
-  if (!platform.access_token || !platform.external_id) {
-    throw new Error("Slack platform is missing its bot token or channel ID.");
+  if (!platform.access_token || !platform.refresh_token || !platform.external_id) {
+    throw new Error("Slack platform is missing its token, d cookie, or channel ID.");
   }
 
-  const messages = await fetchSlackMessages(platform.access_token, platform.external_id);
+  const messages = await fetchSlackMessages(
+    platform.access_token,
+    platform.refresh_token,
+    platform.external_id
+  );
 
   const annCount = await upsertAnnouncements(
     db,
@@ -168,7 +173,7 @@ export async function POST(request: NextRequest) {
 
   const { data, error } = await db
     .from("platforms")
-    .select("id, type, external_id, access_token, last_synced_at")
+    .select("id, type, external_id, access_token, refresh_token, last_synced_at")
     .eq("is_connected", true);
 
   if (error) {

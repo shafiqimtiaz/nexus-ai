@@ -1,9 +1,10 @@
 import "server-only";
 
-// Minimal Discord bot-token message fetch. SERVER ONLY — the bot token is a
-// secret and must never reach the browser. Returns small, cache-friendly shapes
-// (never the raw Discord message blob) and throws a clear Error on any non-2xx
-// so the sync caller can catch and skip Discord without aborting other platforms.
+// Minimal Discord user-token message fetch. SERVER ONLY — the user (browser)
+// token is a secret and must never reach the browser. Returns small,
+// cache-friendly shapes (never the raw Discord message blob) and throws a clear
+// Error on any non-2xx so the sync caller can catch and skip Discord without
+// aborting other platforms.
 
 const DISCORD_API = "https://discord.com/api/v10";
 
@@ -35,7 +36,7 @@ function normalizeMessage(raw: RawDiscordMessage, channelId: string): DiscordMes
 
 async function discordGet(token: string, path: string): Promise<RawDiscordMessage[]> {
   const res = await fetch(`${DISCORD_API}${path}`, {
-    headers: { Authorization: `Bot ${token}` },
+    headers: { Authorization: token },
   });
 
   if (!res.ok) {

@@ -49,27 +49,30 @@ export async function POST(request: NextRequest) {
   const type: PlatformType = body.type;
   const externalId: string | undefined = body.external_id ?? undefined;
   const accessToken: string | undefined = body.access_token ?? undefined;
+  // Slack browser tokens (xoxc-) require the `d` session cookie, stored in the
+  // refresh_token column. Other platforms leave it null.
+  const refreshToken: string | undefined = body.refresh_token ?? undefined;
   let name: string | undefined = body.name ?? undefined;
 
-  // Discord connect flow: validate the bot token against the channel before
+  // Discord connect flow: validate the user token against the channel before
   // persisting anything.
   if (type === "discord") {
     if (!externalId || !accessToken) {
       return Response.json(
-        { error: "A Discord channel ID and bot token are required." },
+        { error: "A Discord channel ID and user token are required." },
         { status: 400 }
       );
     }
 
     const discordRes = await fetch(`${DISCORD_API}/channels/${externalId}`, {
-      headers: { Authorization: `Bot ${accessToken}` },
+      headers: { Authorization: accessToken },
     }).catch(() => null);
 
     if (!discordRes || !discordRes.ok) {
       return Response.json(
         {
           error:
-            "Could not reach that Discord channel with this bot token. Check the token and channel ID, and that the bot is in the server.",
+            "Could not reach that Discord channel with this token. Check the token and channel ID, and that your account can see the channel.",
         },
         { status: 400 }
       );
@@ -79,18 +82,19 @@ export async function POST(request: NextRequest) {
     name = channel?.name ?? name ?? "Discord";
   }
 
-  // Slack connect flow: validate the bot token and channel ID via conversations.info
+  // Slack connect flow: validate the browser token + `d` cookie and channel ID
+  // via conversations.info
   if (type === "slack") {
-    if (!externalId || !accessToken) {
+    if (!externalId || !accessToken || !refreshToken) {
       return Response.json(
-        { error: "A Slack channel ID and bot token (xoxb-...) are required." },
+        { error: "A Slack channel ID, token (xoxc-...) and d cookie (xoxd-...) are required." },
         { status: 400 }
       );
     }
 
     const params = new URLSearchParams({ channel: externalId });
     const slackRes = await fetch(`https://slack.com/api/conversations.info?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${accessToken}`, Cookie: `d=${refreshToken}` },
     }).catch(() => null);
 
     if (!slackRes || !slackRes.ok) {
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Could not connect to Slack channel: ${
             json?.error || "Invalid token or channel ID"
-          }. Make sure the bot is invited to the channel.`,
+          }. Check your xoxc token, d cookie, and channel ID.`,
         },
         { status: 400 }
       );
@@ -152,6 +156,7 @@ export async function POST(request: NextRequest) {
         name,
         external_id: externalId,
         access_token: accessToken,
+        refresh_token: refreshToken ?? null,
         is_connected: true,
       },
       { onConflict: "user_id,type" }

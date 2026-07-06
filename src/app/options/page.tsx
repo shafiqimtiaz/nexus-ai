@@ -33,7 +33,7 @@ export default async function OptionsPage() {
         <PlatformCard
           type="discord"
           displayName="Discord"
-          description="Post reminders and updates to a channel via a bot."
+          description="Sync announcements and coursework from a channel you can access."
           role={role}
         />
         <PlatformCard

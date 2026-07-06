@@ -81,6 +81,7 @@ export function PlatformCard({
 
   const [botToken, setBotToken] = useState("");
   const [channelId, setChannelId] = useState("");
+  const [slackCookie, setSlackCookie] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["platforms"],
@@ -125,6 +126,7 @@ export function PlatformCard({
           type: "slack",
           external_id: channelId.trim(),
           access_token: botToken.trim(),
+          refresh_token: slackCookie.trim(),
         }),
       });
       const json = await res.json();
@@ -135,6 +137,7 @@ export function PlatformCard({
       toast.success(`Connected to #${p.name ?? "Slack"}.`);
       setBotToken("");
       setChannelId("");
+      setSlackCookie("");
       queryClient.invalidateQueries({ queryKey: ["platforms"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -332,20 +335,48 @@ export function PlatformCard({
                     className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
                   >
                     <KeyRound className="h-3.5 w-3.5" />
-                    {type === "gemini" ? "Gemini API Key" : "Bot token"}
+                    {type === "gemini"
+                      ? "Gemini API Key"
+                      : isSlack
+                        ? "Token (xoxc-...)"
+                        : "User token"}
                   </label>
                   <Input
                     id="bot-token"
                     type="password"
                     autoComplete="off"
                     placeholder={
-                      type === "gemini" ? "AIzaSy..." : isSlack ? "xoxb-..." : "Bot token"
+                      type === "gemini"
+                        ? "AIzaSy..."
+                        : isSlack
+                          ? "xoxc-..."
+                          : "Your Discord user token"
                     }
                     value={botToken}
                     disabled={isDemo || connectBot.isPending}
                     onChange={(e) => setBotToken(e.target.value)}
                   />
                 </div>
+                {isSlack && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="slack-cookie"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      d cookie (xoxd-...)
+                    </label>
+                    <Input
+                      id="slack-cookie"
+                      type="password"
+                      autoComplete="off"
+                      placeholder="xoxd-..."
+                      value={slackCookie}
+                      disabled={isDemo || connectBot.isPending}
+                      onChange={(e) => setSlackCookie(e.target.value)}
+                    />
+                  </div>
+                )}
                 {type !== "gemini" && (
                   <div className="space-y-1.5">
                     <label
@@ -383,7 +414,8 @@ export function PlatformCard({
                     isDemo ||
                     connectBot.isPending ||
                     !botToken.trim() ||
-                    (type !== "gemini" && !channelId.trim())
+                    (type !== "gemini" && !channelId.trim()) ||
+                    (isSlack && !slackCookie.trim())
                   }
                   onClick={() => connectBot.mutate()}
                 >

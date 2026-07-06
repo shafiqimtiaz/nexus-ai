@@ -1,7 +1,8 @@
 import "server-only";
 
-// Minimal Slack bot-token history fetch. SERVER ONLY — the bot token is a
-// secret and must never reach the browser. Returns normalized shapes.
+// Minimal Slack browser-token history fetch. SERVER ONLY — the xoxc token and
+// the `d` session cookie are secrets and must never reach the browser. Returns
+// normalized shapes.
 
 const SLACK_API = "https://slack.com/api";
 
@@ -32,9 +33,11 @@ function normalizeMessage(raw: RawSlackMessage, channelId: string): SlackMessage
   };
 }
 
-// Fetch channel history from conversations.history API
+// Fetch channel history from conversations.history API. Browser tokens (xoxc-)
+// only authenticate when paired with the `d` session cookie.
 export async function fetchSlackMessages(
   token: string,
+  cookie: string,
   channelId: string,
   limit = 50
 ): Promise<SlackMessage[]> {
@@ -46,6 +49,7 @@ export async function fetchSlackMessages(
   const res = await fetch(`${SLACK_API}/conversations.history?${params.toString()}`, {
     headers: {
       Authorization: `Bearer ${token}`,
+      Cookie: `d=${cookie}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
   });
