@@ -24,5 +24,6 @@ export async function GET(request: NextRequest) {
     maxAge: 600, // 10 minutes to complete consent
   });
 
-  return NextResponse.redirect(getAuthUrl(state));
+  const authUrl = await getAuthUrl(state, request.url);
+  return NextResponse.redirect(authUrl);
 }

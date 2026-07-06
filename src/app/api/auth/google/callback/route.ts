@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const tokens = await exchangeCode(code);
+    const tokens = await exchangeCode(code, request.url);
 
     const coursesRes = await fetch(CLASSROOM_COURSES_URL, {
       headers: { Authorization: `Bearer ${tokens.access_token}` },

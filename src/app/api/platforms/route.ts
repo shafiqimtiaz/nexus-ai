@@ -7,7 +7,7 @@ import { requireOwner } from "@/lib/auth";
 const SAFE_COLUMNS =
   "id, type, name, external_id, is_connected, last_synced_at";
 
-const PLATFORM_TYPES = ["google_classroom", "discord", "slack", "gemini"] as const;
+const PLATFORM_TYPES = ["google_classroom", "discord", "slack", "gemini", "google_oauth"] as const;
 type PlatformType = (typeof PLATFORM_TYPES)[number];
 
 const DISCORD_API = "https://discord.com/api/v10";
@@ -139,6 +139,14 @@ export async function POST(request: NextRequest) {
     name = "Google Gemini";
   }
 
+  // Google OAuth connect flow: save if provided, otherwise skip (fallback to env)
+  if (type === "google_oauth") {
+    if (!externalId?.trim() || !accessToken?.trim()) {
+      return Response.json({ platform: { type, is_connected: true } });
+    }
+    name = "Google OAuth Credentials";
+  }
+
   const db = createServerClient();
   const { data, error } = await db
     .from("platforms")
@@ -177,6 +185,9 @@ export async function DELETE(request: NextRequest) {
   }
 
   const db = createServerClient();
+  if (type === "google_classroom") {
+    await db.from("platforms").delete().eq("type", "google_oauth");
+  }
   const { data, error } = await db
     .from("platforms")
     .update({

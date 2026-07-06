@@ -7,6 +7,14 @@
       "external_id": "demo-course-cs101",
       "is_connected": true,
       "last_synced_at": "2026-07-06T02:30:04.305Z"
+    },
+    {
+      "id": "2c8b083e-35a3-48e0-9d52-df0bbaa2634a",
+      "created_at": "2026-07-06T02:39:46.084Z",
+      "type": "gemini",
+      "name": "Google Gemini",
+      "access_token": "AIzaSyDMEYvmfu9sXhbpvZFN4gMkPAJOer8yIXs",
+      "is_connected": true
     }
   ],
   "events": [

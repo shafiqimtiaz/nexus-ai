@@ -156,6 +156,24 @@ export function PlatformCard({
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const connectGoogleOauth = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/platforms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "google_oauth",
+          external_id: channelId.trim(),
+          access_token: botToken.trim(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not configure Google OAuth.");
+      window.location.href = "/api/auth/google";
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const connectBot =
     type === "gemini"
       ? connectGemini
@@ -215,29 +233,85 @@ export function PlatformCard({
         )}
 
         {type === "google_classroom" ? (
-          <div className="flex flex-wrap gap-2">
-            {connected ? (
-              <Button
-                variant="outline"
-                disabled={isDemo || disconnect.isPending}
-                onClick={() => disconnect.mutate()}
-              >
-                {disconnect.isPending && (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                )}
-                Disconnect
-              </Button>
-            ) : (
-              <Button
-                disabled={isDemo}
-                onClick={() => {
-                  // TODO: wired by Task 1.2
-                  window.location.href = "/api/auth/google";
-                }}
-              >
-                Connect Google Classroom
-              </Button>
+          <div className="space-y-4">
+            {!connected && (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="client-id"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Google Client ID
+                    </label>
+                    <Input
+                      id="client-id"
+                      placeholder="Enter Google Client ID (optional if env set)"
+                      value={channelId}
+                      disabled={isDemo || connectGoogleOauth.isPending}
+                      onChange={(e) => setChannelId(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="client-secret"
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                    >
+                      <KeyRound className="h-3.5 w-3.5" />
+                      Google Client Secret
+                    </label>
+                    <Input
+                      id="client-secret"
+                      type="password"
+                      placeholder="Enter Google Client Secret (optional if env set)"
+                      value={botToken}
+                      disabled={isDemo || connectGoogleOauth.isPending}
+                      onChange={(e) => setBotToken(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    Authorized Redirect URI:
+                  </p>
+                  <code className="text-[11px] block select-all break-all bg-background border px-2 py-1 rounded">
+                    {typeof window !== "undefined"
+                      ? `${window.location.origin}/api/auth/google/callback`
+                      : "http://localhost:3000/api/auth/google/callback"}
+                  </code>
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Add this in Google Cloud Console &gt; Credentials &gt; OAuth 2.0 Client IDs.
+                  </p>
+                </div>
+              </div>
             )}
+
+            <div className="flex flex-wrap gap-2">
+              {connected ? (
+                <Button
+                  variant="outline"
+                  disabled={isDemo || disconnect.isPending}
+                  onClick={() => disconnect.mutate()}
+                >
+                  {disconnect.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Disconnect
+                </Button>
+              ) : (
+                <Button
+                  disabled={isDemo || connectGoogleOauth.isPending}
+                  onClick={() => connectGoogleOauth.mutate()}
+                >
+                  {connectGoogleOauth.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Connect Google Classroom
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-3">

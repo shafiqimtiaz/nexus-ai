@@ -39,10 +39,17 @@ export interface RefreshResponse {
 
 // Build the authorization URL the owner is redirected to. `access_type=offline`
 // + `prompt=consent` force Google to return a refresh_token every time.
-export function getAuthUrl(state: string): string {
+export async function getAuthUrl(state: string, requestUrl: string): Promise<string> {
+  const db = createServerClient();
+  const { data } = await db.from("platforms").eq("type", "google_oauth").maybeSingle();
+
+  const clientId = data?.external_id || process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const defaultRedirect = new URL("/api/auth/google/callback", requestUrl).toString();
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || defaultRedirect;
+
   const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    redirect_uri: process.env.GOOGLE_OAUTH_REDIRECT_URI!,
+    client_id: clientId!,
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: SCOPES,
     access_type: "offline",
@@ -53,12 +60,20 @@ export function getAuthUrl(state: string): string {
 }
 
 // Exchange the authorization code for tokens.
-export async function exchangeCode(code: string): Promise<TokenResponse> {
+export async function exchangeCode(code: string, requestUrl: string): Promise<TokenResponse> {
+  const db = createServerClient();
+  const { data } = await db.from("platforms").eq("type", "google_oauth").maybeSingle();
+
+  const clientId = data?.external_id || process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = data?.access_token || process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const defaultRedirect = new URL("/api/auth/google/callback", requestUrl).toString();
+  const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || defaultRedirect;
+
   const body = new URLSearchParams({
     code,
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
-    redirect_uri: process.env.GOOGLE_OAUTH_REDIRECT_URI!,
+    client_id: clientId!,
+    client_secret: clientSecret!,
+    redirect_uri: redirectUri,
     grant_type: "authorization_code",
   });
 
@@ -80,9 +95,15 @@ export async function exchangeCode(code: string): Promise<TokenResponse> {
 export async function refreshAccessToken(
   refreshToken: string
 ): Promise<RefreshResponse> {
+  const db = createServerClient();
+  const { data } = await db.from("platforms").eq("type", "google_oauth").maybeSingle();
+
+  const clientId = data?.external_id || process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = data?.access_token || process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+
   const body = new URLSearchParams({
-    client_id: process.env.GOOGLE_OAUTH_CLIENT_ID!,
-    client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET!,
+    client_id: clientId!,
+    client_secret: clientSecret!,
     refresh_token: refreshToken,
     grant_type: "refresh_token",
   });
