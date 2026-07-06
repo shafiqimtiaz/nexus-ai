@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
         access_token: accessToken,
         is_connected: true,
       },
-      { onConflict: "type" }
+      { onConflict: "user_id,type" }
     )
     .select(SAFE_COLUMNS)
     .single();

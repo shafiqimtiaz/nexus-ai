@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
           ? { refresh_token: tokens.refresh_token }
           : {}),
       },
-      { onConflict: "type" }
+      { onConflict: "user_id,type" }
     );
 
     if (error) {
