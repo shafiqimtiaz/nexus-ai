@@ -14,6 +14,10 @@ import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 // Single model constant — swap here to change the model everywhere.
 const MODEL = "gemini-2.5-flash";
 
+if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;
+}
+
 export async function POST(request: NextRequest) {
   const denied = await requireOwner();
   if (denied) return denied;

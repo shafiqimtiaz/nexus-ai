@@ -133,7 +133,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       unreadAnnouncements: unreadRes.count ?? 0,
       upcomingAssignments: assignmentsRes.count ?? 0,
     },
-    recentAnnouncements: (announcementsRes.data ?? []).map((a) => ({
+    recentAnnouncements: (announcementsRes.data ?? []).map((a: any) => ({
       id: a.id,
       title: a.title,
       content: truncate(a.content ?? ""),
