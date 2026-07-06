@@ -2,6 +2,7 @@ import "server-only";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase/server";
+import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
 
 // Local (DB-backed) AI SDK tools for the Nexus agent. Every tool uses the
 // service-role Supabase client and returns compact, JSON-serializable data so
@@ -75,6 +76,10 @@ export function getLocalTools(): Record<string, Tool> {
           .single();
 
         if (error) return fail("create_event", error.message);
+
+        // Sync to Google Calendar in the background
+        writeToGoogleCalendar(title, start_time, end_time, description);
+
         return { created: data };
       },
     }),
@@ -194,6 +199,12 @@ export function getLocalTools(): Record<string, Tool> {
         const { data, error } = await db.from("events").insert(rows).select(EVENT_COLUMNS);
 
         if (error) return fail("generate_study_plan", error.message);
+
+        // Sync generated study blocks to Google Calendar in the background
+        for (const row of rows) {
+          writeToGoogleCalendar(row.title, row.start_time, row.end_time, row.description);
+        }
+
         return { created_count: data?.length ?? 0, study_blocks: data ?? [] };
       },
     }),
@@ -219,6 +230,10 @@ export function getLocalTools(): Record<string, Tool> {
           .single();
 
         if (error) return fail("set_reminder", error.message);
+
+        // Sync reminder to Google Calendar in the background
+        writeToGoogleCalendar(`Reminder: ${title}`, remind_at);
+
         return { created: data };
       },
     }),

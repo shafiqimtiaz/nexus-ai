@@ -14,6 +14,7 @@ const SCOPES = [
   "https://www.googleapis.com/auth/classroom.announcements.readonly",
   "https://www.googleapis.com/auth/classroom.coursework.me.readonly",
   "https://www.googleapis.com/auth/classroom.courseworkmaterials.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
   "openid",
   "email",
 ].join(" ");
@@ -168,4 +169,46 @@ export async function getValidClassroomToken(): Promise<string> {
   }
 
   return refreshed.access_token;
+}
+
+export async function writeToGoogleCalendar(
+  title: string,
+  startTime: string,
+  endTime?: string,
+  description?: string
+): Promise<void> {
+  try {
+    const accessToken = await getValidClassroomToken();
+
+    const start = { dateTime: startTime };
+    const end = {
+      dateTime:
+        endTime || new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+    };
+
+    const response = await fetch(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          summary: title,
+          description: description || "Created via Nexus AI",
+          start,
+          end,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Google Calendar API error:", errText);
+    }
+  } catch (error) {
+    // Fail silently if not connected or API error
+    console.warn("Failed to write to Google Calendar (maybe not connected):", error);
+  }
 }

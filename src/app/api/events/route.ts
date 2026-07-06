@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { requireOwner } from "@/lib/auth";
 import type { EventType } from "@/lib/dashboard";
+import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
 
 // Full event row exposed to the calendar. Nothing sensitive lives on the events
 // table, so every column is safe to return.
@@ -79,6 +80,9 @@ export async function POST(request: NextRequest) {
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
+
+  // Trigger Google Calendar sync in the background
+  writeToGoogleCalendar(body.title.trim(), body.start_time, body.end_time, body.description);
 
   return Response.json({ event: data });
 }
