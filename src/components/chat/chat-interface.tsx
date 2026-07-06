@@ -14,6 +14,7 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   toolCalls: ToolCall[];
+  model?: string;
 };
 
 let idCounter = 0;
@@ -165,7 +166,10 @@ export function ChatInterface({ role }: { role: Role }) {
       toolCalls: [],
     };
     const history = [...messages, userMsg];
-    setMessages([...history, { id: nextId(), role: "assistant", content: "", toolCalls: [] }]);
+    setMessages([
+      ...history,
+      { id: nextId(), role: "assistant", content: "", toolCalls: [], model: selectedModel },
+    ]);
     setInput("");
     setBusy(true);
 
@@ -237,7 +241,8 @@ export function ChatInterface({ role }: { role: Role }) {
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:border-border transition-colors"
+              disabled={busy}
+              className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer hover:border-border transition-colors disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <option value="gemini-flash-lite-latest">Gemini Flash Lite Latest (Default)</option>
               <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
@@ -311,6 +316,11 @@ export function ChatInterface({ role }: { role: Role }) {
                 ) : m.role === "assistant" && busy ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
+                {m.role === "assistant" && m.model && (
+                  <div className="mt-1 text-[9px] text-muted-foreground/60 select-none text-right">
+                    {m.model}
+                  </div>
+                )}
               </div>
             </div>
           ))}
