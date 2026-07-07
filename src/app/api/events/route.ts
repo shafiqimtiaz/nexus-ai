@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import type { EventType } from "@/lib/dashboard";
-import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
+import {
+  writeToGoogleCalendar,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  getGooglePlatformId,
+  gcalExternalId,
+  parseGcalId,
+} from "@/lib/auth/google-oauth";
 
 // Full event row exposed to the calendar. Nothing sensitive lives on the events
 // table, so every column is safe to return.
@@ -77,8 +84,24 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  // Trigger Google Calendar sync in the background
-  writeToGoogleCalendar(body.title.trim(), body.start_time, body.end_time, body.description);
+  // Push to Google and store the returned id so later edits/deletes can sync.
+  // Awaited (not fire-and-forget) because we need the id to build the mapping.
+  const googleId = await writeToGoogleCalendar(
+    body.title.trim(),
+    body.start_time,
+    body.end_time,
+    body.description
+  );
+  if (googleId) {
+    const platformId = await getGooglePlatformId();
+    const externalId = gcalExternalId(googleId);
+    await db
+      .from("events")
+      .update({ source_platform: platformId, source_external_id: externalId })
+      .eq("id", data.id);
+    data.source_platform = platformId;
+    data.source_external_id = externalId;
+  }
 
   return Response.json({ event: data });
 }
@@ -126,6 +149,36 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  // Propagate the edit to Google. If the row already maps to a Google event,
+  // patch it; otherwise create one now and store the mapping.
+  const gid = parseGcalId(data.source_external_id);
+  if (gid) {
+    await updateGoogleCalendarEvent(gid, {
+      title: "title" in updates ? (updates.title as string) : undefined,
+      startTime: "start_time" in updates ? (updates.start_time as string) : undefined,
+      endTime:
+        "end_time" in updates ? ((updates.end_time as string | null) ?? undefined) : undefined,
+      description:
+        "description" in updates
+          ? ((updates.description as string | null) ?? undefined)
+          : undefined,
+    });
+  } else {
+    const googleId = await writeToGoogleCalendar(
+      data.title,
+      data.start_time,
+      data.end_time ?? undefined,
+      data.description ?? undefined
+    );
+    if (googleId) {
+      const platformId = await getGooglePlatformId();
+      await db
+        .from("events")
+        .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
+        .eq("id", data.id);
+    }
+  }
+
   return Response.json({ event: data });
 }
 
@@ -138,9 +191,22 @@ export async function DELETE(request: NextRequest) {
   }
 
   const db = createServerClient();
+
+  // Read the mapping before deleting so we can remove the Google counterpart.
+  const { data: row } = await db
+    .from("events")
+    .select("source_external_id")
+    .eq("id", id)
+    .maybeSingle();
+
   const { error } = await db.from("events").delete().eq("id", id);
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });
+  }
+
+  const gid = parseGcalId(row?.source_external_id);
+  if (gid) {
+    await deleteGoogleCalendarEvent(gid);
   }
 
   return Response.json({ ok: true });

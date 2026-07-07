@@ -2,7 +2,13 @@ import "server-only";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase/server";
-import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
+import {
+  writeToGoogleCalendar,
+  updateGoogleCalendarEvent,
+  getGooglePlatformId,
+  gcalExternalId,
+  parseGcalId,
+} from "@/lib/auth/google-oauth";
 
 // Local (DB-backed) AI SDK tools for the Nexus agent. Every tool uses the
 // service-role Supabase client and returns compact, JSON-serializable data so
@@ -17,6 +23,32 @@ const RESOURCE_COLUMNS = "id, title, url, description, is_pinned";
 
 function fail(context: string, message: string) {
   return { error: `${context}: ${message}` };
+}
+
+// Push a freshly-created local event to Google Calendar and store the returned
+// id back on the row (source_external_id = gcal:<id>) so later edits/deletes and
+// the import reconcile can match it. No-op when Google isn't connected.
+async function pushEventToGoogle(
+  db: ReturnType<typeof createServerClient>,
+  eventId: string,
+  title: string,
+  startTime: string,
+  endTime?: string | null,
+  description?: string | null
+): Promise<void> {
+  const googleId = await writeToGoogleCalendar(
+    title,
+    startTime,
+    endTime ?? undefined,
+    description ?? undefined
+  );
+  if (googleId) {
+    const platformId = await getGooglePlatformId();
+    await db
+      .from("events")
+      .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
+      .eq("id", eventId);
+  }
 }
 
 export function getLocalTools(): Record<string, Tool> {
@@ -77,8 +109,8 @@ export function getLocalTools(): Record<string, Tool> {
 
         if (error) return fail("create_event", error.message);
 
-        // Sync to Google Calendar in the background
-        writeToGoogleCalendar(title, start_time, end_time, description);
+        // Push to Google and store the mapping so future edits/deletes sync.
+        await pushEventToGoogle(db, data.id, title, start_time, end_time, description);
 
         return { created: data };
       },
@@ -110,6 +142,33 @@ export function getLocalTools(): Record<string, Tool> {
           .single();
 
         if (error) return fail("edit_event", error.message);
+
+        // Propagate to Google. EVENT_COLUMNS omits source_external_id, so read
+        // the mapping separately.
+        const { data: mapRow } = await db
+          .from("events")
+          .select("source_external_id")
+          .eq("id", id)
+          .maybeSingle();
+        const gid = parseGcalId(mapRow?.source_external_id);
+        if (gid) {
+          await updateGoogleCalendarEvent(gid, {
+            title: patch.title as string | undefined,
+            startTime: patch.start_time as string | undefined,
+            endTime: patch.end_time as string | undefined,
+            description: patch.description as string | undefined,
+          });
+        } else {
+          await pushEventToGoogle(
+            db,
+            id,
+            data.title,
+            data.start_time,
+            data.end_time,
+            data.description
+          );
+        }
+
         return { updated: data };
       },
     }),
@@ -228,9 +287,16 @@ export function getLocalTools(): Record<string, Tool> {
 
         if (error) return fail("generate_study_plan", error.message);
 
-        // Sync generated study blocks to Google Calendar in the background
-        for (const row of rows) {
-          writeToGoogleCalendar(row.title, row.start_time, row.end_time, row.description);
+        // Push each generated study block to Google and store its mapping.
+        for (const created of data ?? []) {
+          await pushEventToGoogle(
+            db,
+            created.id,
+            created.title,
+            created.start_time,
+            created.end_time,
+            created.description
+          );
         }
 
         return { created_count: data?.length ?? 0, study_blocks: data ?? [] };
@@ -259,8 +325,8 @@ export function getLocalTools(): Record<string, Tool> {
 
         if (error) return fail("set_reminder", error.message);
 
-        // Sync reminder to Google Calendar in the background
-        writeToGoogleCalendar(`Reminder: ${title}`, remind_at);
+        // Push the reminder to Google and store the mapping.
+        await pushEventToGoogle(db, data.id, `Reminder: ${title}`, remind_at);
 
         return { created: data };
       },

@@ -6,7 +6,13 @@ import { fetchSlackMessages } from "@/lib/platforms/slack";
 import { listAnnouncements, listAssignments } from "../../../../mcp/classroom/tools";
 import { createGoogle } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
+import {
+  writeToGoogleCalendar,
+  listGoogleCalendarEvents,
+  getGooglePlatformId,
+  gcalExternalId,
+  parseGcalId,
+} from "@/lib/auth/google-oauth";
 
 // POST /api/sync — pull announcements/assignments from every connected platform
 // into the local DB cache. Owner-only (it mutates the DB). Each platform is
@@ -80,12 +86,115 @@ async function upsertAnnouncements(
   return rows.length;
 }
 
+// Two-way calendar sync for the Google connection. Returns the number of
+// events touched (imported/updated/pushed). Approach A: list a bounded window,
+// upsert Google→local (Google wins on title/desc/times, local event_type kept),
+// delete-detect within the window, then backfill unmapped local events up.
+const IMPORT_WINDOW_PAST_MS = 30 * 24 * 60 * 60 * 1000;
+const IMPORT_WINDOW_FUTURE_MS = 90 * 24 * 60 * 60 * 1000;
+
+async function syncGoogleCalendar(
+  db: ReturnType<typeof createServerClient>,
+  platformId: string
+): Promise<number> {
+  const now = Date.now();
+  const timeMin = new Date(now - IMPORT_WINDOW_PAST_MS).toISOString();
+  const timeMax = new Date(now + IMPORT_WINDOW_FUTURE_MS).toISOString();
+  const timeMinMs = now - IMPORT_WINDOW_PAST_MS;
+  const timeMaxMs = now + IMPORT_WINDOW_FUTURE_MS;
+
+  const googleEvents = await listGoogleCalendarEvents(timeMin, timeMax);
+  const googleIds = new Set(googleEvents.map((e) => e.id));
+  let touched = 0;
+
+  // Existing calendar-synced rows for this platform (gcal: marker only, so
+  // Classroom coursework rows are never reconciled or deleted here).
+  const { data: platformRows } = await db
+    .from("events")
+    .select("id, source_external_id, event_type, start_time")
+    .eq("source_platform", platformId);
+  const localGcal = (platformRows ?? []).filter((r: any) => parseGcalId(r.source_external_id));
+  const localByGid = new Map<string, any>(
+    localGcal.map((r: any) => [parseGcalId(r.source_external_id) as string, r])
+  );
+
+  // Google → local. Update existing (preserve event_type), insert new as "other".
+  for (const ev of googleEvents) {
+    if (!ev.startTime) continue;
+    const existing = localByGid.get(ev.id);
+    if (existing) {
+      await db
+        .from("events")
+        .update({
+          title: ev.summary,
+          description: ev.description,
+          start_time: ev.startTime,
+          end_time: ev.endTime,
+        })
+        .eq("id", existing.id);
+    } else {
+      await db.from("events").insert({
+        title: ev.summary,
+        description: ev.description,
+        event_type: "other",
+        start_time: ev.startTime,
+        end_time: ev.endTime,
+        source_platform: platformId,
+        source_external_id: gcalExternalId(ev.id),
+        is_auto_detected: true,
+      });
+    }
+    touched++;
+  }
+
+  // Delete-detection: a local gcal row inside the window but absent from Google
+  // was deleted on Google → remove locally. Rows outside the window are skipped
+  // (we can't judge them from this fetch).
+  for (const r of localGcal) {
+    const startMs = r.start_time ? new Date(r.start_time).getTime() : NaN;
+    if (Number.isNaN(startMs) || startMs < timeMinMs || startMs > timeMaxMs) continue;
+    const gid = parseGcalId(r.source_external_id) as string;
+    if (!googleIds.has(gid)) {
+      await db.from("events").delete().eq("id", r.id);
+      touched++;
+    }
+  }
+
+  // Backfill: local events never pushed to Google (manual/AI events created
+  // while disconnected) have no source_external_id → push them up and map them.
+  const { data: allEvents } = await db
+    .from("events")
+    .select("id, title, start_time, end_time, description, source_external_id");
+  for (const r of (allEvents ?? []) as any[]) {
+    if (r.source_external_id || !r.start_time) continue;
+    const googleId = await writeToGoogleCalendar(
+      r.title,
+      r.start_time,
+      r.end_time ?? undefined,
+      r.description ?? undefined
+    );
+    if (googleId) {
+      await db
+        .from("events")
+        .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
+        .eq("id", r.id);
+      touched++;
+    }
+  }
+
+  return touched;
+}
+
 async function syncClassroom(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
+  // Calendar sync runs for any Google connection, even one without a Classroom
+  // course (external_id === "google_user").
+  const calendarEvents = await syncGoogleCalendar(db, platform.id);
+
   if (platform.external_id === "google_user") {
-    return { announcements: 0, events: 0 };
+    return { announcements: 0, events: calendarEvents };
   }
   const announcements = await listAnnouncements();
   const annCount = await upsertAnnouncements(
@@ -124,7 +233,7 @@ async function syncClassroom(
     eventCount = eventRows.length;
   }
 
-  return { announcements: annCount, events: eventCount };
+  return { announcements: annCount, events: eventCount + calendarEvents };
 }
 
 async function syncDiscord(
@@ -350,12 +459,25 @@ Rules:
 
               if (!evError) {
                 try {
-                  await writeToGoogleCalendar(
+                  const googleId = await writeToGoogleCalendar(
                     result.event.title,
                     result.event.start_time,
                     undefined,
                     result.event.description
                   );
+                  // Store the gcal mapping on the just-upserted row so the import
+                  // reconcile matches it instead of re-importing it as a dupe.
+                  if (googleId) {
+                    const gPlatformId = await getGooglePlatformId();
+                    await db
+                      .from("events")
+                      .update({
+                        source_platform: gPlatformId,
+                        source_external_id: gcalExternalId(googleId),
+                      })
+                      .eq("source_platform", ann.platform_id)
+                      .eq("source_external_id", `auto-${ann.id}`);
+                  }
                 } catch {}
 
                 await db.from("agent_actions").insert({

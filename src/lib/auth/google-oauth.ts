@@ -171,44 +171,201 @@ export async function getValidClassroomToken(): Promise<string> {
   return refreshed.access_token;
 }
 
+// Base URL for the connected user's primary calendar.
+const CALENDAR_EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+
+// Calendar-synced events are tagged in events.source_external_id with this prefix
+// so reconcile/delete-detection only ever touch calendar rows — never Classroom
+// coursework, which shares the same source_platform.
+export const GCAL_PREFIX = "gcal:";
+
+export function gcalExternalId(googleId: string): string {
+  return GCAL_PREFIX + googleId;
+}
+
+// Returns the raw Google event id if externalId is a calendar marker, else null.
+export function parseGcalId(externalId: string | null | undefined): string | null {
+  return externalId && externalId.startsWith(GCAL_PREFIX)
+    ? externalId.slice(GCAL_PREFIX.length)
+    : null;
+}
+
+// The platforms row id for the Google connection — used as source_platform on
+// calendar-synced events. Null when Google was never connected.
+export async function getGooglePlatformId(): Promise<string | null> {
+  const db = createServerClient();
+  const { data } = await db
+    .from("platforms")
+    .select("id")
+    .eq("type", "google_classroom")
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+function eventTimes(startTime: string, endTime?: string) {
+  return {
+    start: { dateTime: startTime },
+    end: {
+      dateTime:
+        endTime || new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
+    },
+  };
+}
+
+// Create an event on the connected primary calendar. Returns the created Google
+// event id (persisted locally so the row can later be updated/deleted on
+// Google), or null if not connected / the API failed.
 export async function writeToGoogleCalendar(
   title: string,
   startTime: string,
   endTime?: string,
   description?: string
-): Promise<void> {
+): Promise<string | null> {
   try {
     const accessToken = await getValidClassroomToken();
 
-    const start = { dateTime: startTime };
-    const end = {
-      dateTime:
-        endTime || new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString(),
-    };
-
-    const response = await fetch(
-      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          summary: title,
-          description: description || "Created via Nexus AI",
-          start,
-          end,
-        }),
-      }
-    );
+    const response = await fetch(CALENDAR_EVENTS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: title,
+        description: description || "Created via Nexus AI",
+        ...eventTimes(startTime, endTime),
+      }),
+    });
 
     if (!response.ok) {
       const errText = await response.text();
       console.error("Google Calendar API error:", errText);
+      return null;
     }
+
+    const created = (await response.json().catch(() => null)) as { id?: string } | null;
+    return created?.id ?? null;
   } catch (error) {
     // Fail silently if not connected or API error
     console.warn("Failed to write to Google Calendar (maybe not connected):", error);
+    return null;
+  }
+}
+
+// Patch an existing Google event. Only the fields passed are changed.
+export async function updateGoogleCalendarEvent(
+  googleId: string,
+  fields: { title?: string; startTime?: string; endTime?: string; description?: string }
+): Promise<void> {
+  try {
+    const accessToken = await getValidClassroomToken();
+
+    const body: Record<string, unknown> = {};
+    if (fields.title !== undefined) body.summary = fields.title;
+    if (fields.description !== undefined) body.description = fields.description;
+    if (fields.startTime !== undefined) {
+      const { start, end } = eventTimes(fields.startTime, fields.endTime);
+      body.start = start;
+      // Only overwrite end when a start was given; otherwise leave Google's end.
+      if (fields.endTime !== undefined) body.end = end;
+    } else if (fields.endTime !== undefined) {
+      body.end = { dateTime: fields.endTime };
+    }
+
+    if (Object.keys(body).length === 0) return;
+
+    const response = await fetch(`${CALENDAR_EVENTS_URL}/${encodeURIComponent(googleId)}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      console.error("Google Calendar update error:", await response.text());
+    }
+  } catch (error) {
+    console.warn("Failed to update Google Calendar event:", error);
+  }
+}
+
+// Delete a Google event. 404/410 mean it's already gone — treated as success.
+export async function deleteGoogleCalendarEvent(googleId: string): Promise<void> {
+  try {
+    const accessToken = await getValidClassroomToken();
+
+    const response = await fetch(`${CALENDAR_EVENTS_URL}/${encodeURIComponent(googleId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok && response.status !== 404 && response.status !== 410) {
+      console.error("Google Calendar delete error:", await response.text());
+    }
+  } catch (error) {
+    console.warn("Failed to delete Google Calendar event:", error);
+  }
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  summary: string;
+  description: string | null;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+// List events on the primary calendar within [timeMin, timeMax]. singleEvents
+// expands recurring series into instances. Returns [] if not connected.
+export async function listGoogleCalendarEvents(
+  timeMin: string,
+  timeMax: string
+): Promise<GoogleCalendarEvent[]> {
+  try {
+    const accessToken = await getValidClassroomToken();
+
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      singleEvents: "true",
+      showDeleted: "false",
+      orderBy: "startTime",
+      maxResults: "250",
+    });
+
+    const response = await fetch(`${CALENDAR_EVENTS_URL}?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.error("Google Calendar list error:", await response.text());
+      return [];
+    }
+
+    const data = (await response.json().catch(() => null)) as {
+      items?: Array<{
+        id: string;
+        status?: string;
+        summary?: string;
+        description?: string;
+        start?: { dateTime?: string; date?: string };
+        end?: { dateTime?: string; date?: string };
+      }>;
+    } | null;
+
+    return (data?.items ?? [])
+      .filter((item) => item.status !== "cancelled" && item.id)
+      .map((item) => ({
+        id: item.id,
+        summary: item.summary || "(no title)",
+        description: item.description ?? null,
+        startTime: item.start?.dateTime ?? item.start?.date ?? null,
+        endTime: item.end?.dateTime ?? item.end?.date ?? null,
+      }));
+  } catch (error) {
+    console.warn("Failed to list Google Calendar events:", error);
+    return [];
   }
 }
