@@ -10,7 +10,6 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { AssignmentsModal } from "@/components/dashboard/assignments-modal";
 import { AnnouncementsModal } from "@/components/dashboard/announcements-modal";
-import { cn } from "@/lib/utils";
 import type { DashboardData, DashboardEvent } from "@/lib/dashboard";
 
 function Stat({
@@ -26,10 +25,11 @@ function Stat({
 }) {
   return (
     <Card
-      className={cn(
-        "relative",
-        onClick && "cursor-pointer transition-colors hover:bg-accent/50"
-      )}
+      className={
+        onClick
+          ? "group relative cursor-pointer transition-colors hover:bg-accent/50"
+          : undefined
+      }
     >
       {onClick && (
         <button

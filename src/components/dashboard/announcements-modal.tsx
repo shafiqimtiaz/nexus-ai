@@ -125,6 +125,11 @@ function AnnouncementRow({
   );
 }
 
+// Cache fetch results so reopening the modal is instant
+let cachedTotal = 0;
+let cachedPage = -1;
+let cachedItems: DashboardAnnouncement[] = [];
+
 export function AnnouncementsModal({
   open,
   onOpenChange,
@@ -132,15 +137,21 @@ export function AnnouncementsModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [items, setItems] = useState<DashboardAnnouncement[]>([]);
-  const [total, setTotal] = useState(0);
+  const [items, setItems] = useState<DashboardAnnouncement[]>(cachedItems);
+  const [total, setTotal] = useState(cachedTotal);
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const fetchPage = useCallback(async (p: number) => {
-    setLoading(true);
+    // Return cached page immediately if available
+    if (p === cachedPage && cachedItems.length > 0) {
+      setItems(cachedItems);
+      setTotal(cachedTotal);
+      return;
+    }
+    setFetching(true);
     try {
       const params = new URLSearchParams({
         page: String(p),
@@ -149,13 +160,16 @@ export function AnnouncementsModal({
       const res = await fetch(`/api/announcements?${params}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      setItems(data.items ?? []);
-      setTotal(data.total ?? 0);
+      cachedItems = data.items ?? [];
+      cachedTotal = data.total ?? 0;
+      cachedPage = p;
+      setItems(cachedItems);
+      setTotal(cachedTotal);
     } catch {
       setItems([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      setFetching(false);
     }
   }, []);
 
@@ -173,7 +187,7 @@ export function AnnouncementsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon icon={Megaphone01Icon} className="h-5 w-5 text-primary" />
@@ -181,7 +195,7 @@ export function AnnouncementsModal({
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
+        {fetching ? (
           <div className="py-12 text-center">
             <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
