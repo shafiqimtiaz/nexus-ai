@@ -19,6 +19,7 @@ export default async function OptionsPage() {
       </div>
 
       <div className="space-y-4">
+        <AiRulesCard role={role} />
         <PlatformCard
           type="gemini"
           displayName="Google Gemini"
@@ -43,7 +44,6 @@ export default async function OptionsPage() {
           description="Sync announcements and coursework from your workspace channels."
           role={role}
         />
-        <AiRulesCard role={role} />
       </div>
     </div>
   );
