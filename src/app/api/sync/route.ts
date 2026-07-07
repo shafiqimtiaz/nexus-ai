@@ -43,6 +43,15 @@ interface PlatformRow {
   last_synced_at: string | null;
 }
 
+// One token can back several channels; they're stored comma-separated in
+// external_id.
+function parseChannelIds(raw: string | null): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
 // First ~60 chars of the announcement text as a title, or null when empty.
 function deriveTitle(text: string): string | null {
   const trimmed = text.trim();
@@ -122,11 +131,16 @@ async function syncDiscord(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
-  if (!platform.access_token || !platform.external_id) {
+  const channelIds = parseChannelIds(platform.external_id);
+  if (!platform.access_token || !channelIds.length) {
     throw new Error("Discord platform is missing its user token or channel ID.");
   }
 
-  const messages = await fetchChannelMessages(platform.access_token, platform.external_id);
+  const messages = (
+    await Promise.all(
+      channelIds.map((channelId) => fetchChannelMessages(platform.access_token!, channelId))
+    )
+  ).flat();
 
   const annCount = await upsertAnnouncements(
     db,
@@ -148,15 +162,18 @@ async function syncSlack(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
-  if (!platform.access_token || !platform.refresh_token || !platform.external_id) {
+  const channelIds = parseChannelIds(platform.external_id);
+  if (!platform.access_token || !platform.refresh_token || !channelIds.length) {
     throw new Error("Slack platform is missing its token, d cookie, or channel ID.");
   }
 
-  const messages = await fetchSlackMessages(
-    platform.access_token,
-    platform.refresh_token,
-    platform.external_id
-  );
+  const messages = (
+    await Promise.all(
+      channelIds.map((channelId) =>
+        fetchSlackMessages(platform.access_token!, platform.refresh_token!, channelId)
+      )
+    )
+  ).flat();
 
   const annCount = await upsertAnnouncements(
     db,

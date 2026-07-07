@@ -9,6 +9,8 @@ import {
   Mortarboard02Icon,
   Message01Icon,
   SparklesIcon,
+  Add01Icon,
+  Delete02Icon,
 } from "@hugeicons/core-free-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -84,6 +86,16 @@ export function PlatformCard({
   const [botToken, setBotToken] = useState("");
   const [channelId, setChannelId] = useState("");
   const [slackCookie, setSlackCookie] = useState("");
+  // Discord/Slack support multiple channels under one token; Google flows still
+  // use the scalar `channelId` above for their Client ID.
+  const [channelIds, setChannelIds] = useState<string[]>([""]);
+
+  const updateChannel = (i: number, v: string) =>
+    setChannelIds((prev) => prev.map((c, idx) => (idx === i ? v : c)));
+  const addChannel = () => setChannelIds((prev) => [...prev, ""]);
+  const removeChannel = (i: number) =>
+    setChannelIds((prev) => prev.filter((_, idx) => idx !== i));
+  const joinedChannels = channelIds.map((c) => c.trim()).filter(Boolean).join(",");
 
   const { data, isLoading } = useQuery({
     queryKey: ["platforms"],
@@ -102,7 +114,7 @@ export function PlatformCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "discord",
-          external_id: channelId.trim(),
+          external_id: joinedChannels,
           access_token: botToken.trim(),
         }),
       });
@@ -111,9 +123,9 @@ export function PlatformCard({
       return json.platform as SafePlatform;
     },
     onSuccess: (p) => {
-      toast.success(`Connected to #${p.name ?? "Discord"}.`);
+      toast.success(`Connected to ${p.name ?? "Discord"}.`);
       setBotToken("");
-      setChannelId("");
+      setChannelIds([""]);
       queryClient.invalidateQueries({ queryKey: ["platforms"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -126,7 +138,7 @@ export function PlatformCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "slack",
-          external_id: channelId.trim(),
+          external_id: joinedChannels,
           access_token: botToken.trim(),
           refresh_token: slackCookie.trim(),
         }),
@@ -136,9 +148,9 @@ export function PlatformCard({
       return json.platform as SafePlatform;
     },
     onSuccess: (p) => {
-      toast.success(`Connected to #${p.name ?? "Slack"}.`);
+      toast.success(`Connected to ${p.name ?? "Slack"}.`);
       setBotToken("");
-      setChannelId("");
+      setChannelIds([""]);
       setSlackCookie("");
       queryClient.invalidateQueries({ queryKey: ["platforms"] });
     },
@@ -389,25 +401,50 @@ export function PlatformCard({
                       />
                     </div>
                   )}
-                  {type !== "gemini" && (
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="bot-channel"
-                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                      >
-                        <HugeiconsIcon icon={HashIcon} className="h-3.5 w-3.5" />
-                        Channel ID
-                      </label>
-                      <Input
-                        id="bot-channel"
-                        placeholder={isSlack ? "C12345678" : "123456789012345678"}
-                        value={channelId}
-                        disabled={isDemo || connectBot.isPending}
-                        onChange={(e) => setChannelId(e.target.value)}
-                      />
-                    </div>
-                  )}
                 </div>
+
+                {type !== "gemini" && (
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <HugeiconsIcon icon={HashIcon} className="h-3.5 w-3.5" />
+                      Channel IDs
+                    </label>
+                    <div className="space-y-2">
+                      {channelIds.map((cid, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input
+                            placeholder={isSlack ? "C12345678" : "123456789012345678"}
+                            value={cid}
+                            disabled={isDemo || connectBot.isPending}
+                            onChange={(e) => updateChannel(i, e.target.value)}
+                          />
+                          {channelIds.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={isDemo || connectBot.isPending}
+                              onClick={() => removeChannel(i)}
+                              aria-label="Remove channel"
+                            >
+                              <HugeiconsIcon icon={Delete02Icon} className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isDemo || connectBot.isPending}
+                      onClick={addChannel}
+                    >
+                      <HugeiconsIcon icon={Add01Icon} className="h-3.5 w-3.5" />
+                      Add channel
+                    </Button>
+                  </div>
+                )}
 
                 {type === "gemini" && (
                   <p className="text-[11px] text-muted-foreground">
@@ -473,7 +510,7 @@ export function PlatformCard({
                     isDemo ||
                     connectBot.isPending ||
                     !botToken.trim() ||
-                    (type !== "gemini" && !channelId.trim()) ||
+                    (type !== "gemini" && !joinedChannels) ||
                     (isSlack && !slackCookie.trim())
                   }
                   onClick={() => connectBot.mutate()}
