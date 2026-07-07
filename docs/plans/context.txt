@@ -1,0 +1,5 @@
+this is a projerct for a agentic ai hackathon by google
+
+improtnat links
+- https://www.kaggle.com/competitions/5-day-ai-agents-intensive-vibecoding-course-with-google/overview
+- https://www.kaggle.com/competitions/vibecoding-agents-capstone-project/team
