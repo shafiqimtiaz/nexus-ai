@@ -45,10 +45,16 @@ export function SyncOnLoad({ role }: { role: Role }) {
     }
   }
 
+  // Auto-sync on mount + poll every 15 minutes while the dashboard is open.
+  // The 15-min staleness gate on the server prevents redundant API calls.
   useEffect(() => {
-    if (role !== "owner" || didAutoSync.current) return;
-    didAutoSync.current = true;
-    void runSync(false);
+    if (role !== "owner") return;
+    if (!didAutoSync.current) {
+      didAutoSync.current = true;
+      void runSync(false);
+    }
+    const interval = setInterval(() => void runSync(false), 15 * 60 * 1000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role]);
 
