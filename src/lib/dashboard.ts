@@ -110,7 +110,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .from("announcements")
       .select("id, title, content, author, source_url, announced_at")
       .order("announced_at", { ascending: false, nullsFirst: false })
-      .limit(5),
+      .limit(30),
     db.from("resources").select("id, title, url, description").eq("is_pinned", true).limit(6),
     db
       .from("agent_actions")
