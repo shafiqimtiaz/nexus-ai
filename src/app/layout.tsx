@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { ChatWidget } from "@/components/chat/chat-widget";
 import { getRole } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -43,6 +44,7 @@ export default async function RootLayout({
               <main className="flex-1 overflow-auto p-6">{children}</main>
             </div>
           </div>
+          <ChatWidget role={role} />
         </Providers>
       </body>
     </html>

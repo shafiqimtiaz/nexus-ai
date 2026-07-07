@@ -102,7 +102,7 @@ async function readUiStream(
   if (buffer.trim()) dispatch(buffer);
 }
 
-export function ChatInterface({ role }: { role: Role }) {
+export function ChatInterface({ role, expanded = false }: { role: Role; expanded?: boolean }) {
   const router = useRouter();
   const isDemo = role === "demo";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -292,7 +292,7 @@ export function ChatInterface({ role }: { role: Role }) {
                   m.role === "user" ? "bg-green-600 text-white" : "bg-muted text-foreground"
                 )}
               >
-                {m.role === "assistant" &&
+                {m.role === "assistant" && expanded &&
                   m.toolCalls.map((call) => <ToolCallDisplay key={call.toolCallId} call={call} />)}
                 {m.content ? (
                   m.role === "assistant" ? (
@@ -321,7 +321,7 @@ export function ChatInterface({ role }: { role: Role }) {
           void send();
         }}
       >
-        {!isDemo && hasKey && (
+        {!isDemo && hasKey && expanded && (
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}

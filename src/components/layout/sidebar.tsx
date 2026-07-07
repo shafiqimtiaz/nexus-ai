@@ -9,7 +9,6 @@ import {
   DashboardSquare01Icon,
   Calendar03Icon,
   BookOpen01Icon,
-  Message01Icon,
   Settings01Icon,
   ArrowLeftDoubleIcon,
   ArrowRightDoubleIcon,
@@ -20,7 +19,6 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: DashboardSquare01Icon },
   { href: "/calendar", label: "Calendar", icon: Calendar03Icon },
   { href: "/resources", label: "Resources", icon: BookOpen01Icon },
-  { href: "/chat", label: "AI Chat", icon: Message01Icon },
   { href: "/options", label: "Options", icon: Settings01Icon },
 ];
 
