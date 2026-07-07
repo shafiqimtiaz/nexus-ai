@@ -9,6 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { AssignmentsModal } from "@/components/dashboard/assignments-modal";
+import { AnnouncementsModal } from "@/components/dashboard/announcements-modal";
 import { cn } from "@/lib/utils";
 import type { DashboardData, DashboardEvent } from "@/lib/dashboard";
 
@@ -60,7 +61,8 @@ export function QuickStats({
   stats: DashboardData["stats"];
   assignments: DashboardEvent[];
 }) {
-  const [modalOpen, setModalOpen] = useState(false);
+  const [assignmentsOpen, setAssignmentsOpen] = useState(false);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -85,19 +87,25 @@ export function QuickStats({
           icon={Notification03Icon}
           value={String(stats.unreadAnnouncements)}
           label="Unread announcements"
+          onClick={() => setAnnouncementsOpen(true)}
         />
         <Stat
           icon={ClipboardListIcon}
           value={String(stats.upcomingAssignments)}
           label="Upcoming assignments"
-          onClick={() => setModalOpen(true)}
+          onClick={() => setAssignmentsOpen(true)}
         />
       </div>
 
       <AssignmentsModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
+        open={assignmentsOpen}
+        onOpenChange={setAssignmentsOpen}
         assignments={assignments}
+      />
+
+      <AnnouncementsModal
+        open={announcementsOpen}
+        onOpenChange={setAnnouncementsOpen}
       />
     </>
   );
