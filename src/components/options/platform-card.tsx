@@ -89,6 +89,9 @@ export function PlatformCard({
   // Discord/Slack support multiple channels under one token; Google flows still
   // use the scalar `channelId` above for their Client ID.
   const [channelIds, setChannelIds] = useState<string[]>([""]);
+  // Editing channels on an already-connected Discord/Slack card. The token is
+  // never returned to the browser, so re-collect it on update.
+  const [managing, setManaging] = useState(false);
 
   const updateChannel = (i: number, v: string) =>
     setChannelIds((prev) => prev.map((c, idx) => (idx === i ? v : c)));
@@ -96,6 +99,20 @@ export function PlatformCard({
   const removeChannel = (i: number) =>
     setChannelIds((prev) => prev.filter((_, idx) => idx !== i));
   const joinedChannels = channelIds.map((c) => c.trim()).filter(Boolean).join(",");
+
+  const openManage = (externalId: string | null) => {
+    const current = (externalId ?? "").split(",").map((c) => c.trim()).filter(Boolean);
+    setChannelIds(current.length ? current : [""]);
+    setBotToken("");
+    setSlackCookie("");
+    setManaging(true);
+  };
+  const cancelManage = () => {
+    setManaging(false);
+    setChannelIds([""]);
+    setBotToken("");
+    setSlackCookie("");
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["platforms"],
@@ -126,6 +143,7 @@ export function PlatformCard({
       toast.success(`Connected to ${p.name ?? "Discord"}.`);
       setBotToken("");
       setChannelIds([""]);
+      setManaging(false);
       queryClient.invalidateQueries({ queryKey: ["platforms"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -152,6 +170,7 @@ export function PlatformCard({
       setBotToken("");
       setChannelIds([""]);
       setSlackCookie("");
+      setManaging(false);
       queryClient.invalidateQueries({ queryKey: ["platforms"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -348,8 +367,14 @@ export function PlatformCard({
           </div>
         ) : (
           <div className="space-y-3">
-            {!connected && (
+            {(!connected || managing) && (
               <>
+                {managing && (
+                  <p className="text-xs text-muted-foreground">
+                    Edit the channel list below, then re-enter your token to update. Tokens are
+                    never stored in the browser, so they must be provided again.
+                  </p>
+                )}
                 <div
                   className={cn("grid gap-3", type === "gemini" ? "grid-cols-1" : "sm:grid-cols-2")}
                 >
@@ -495,15 +520,49 @@ export function PlatformCard({
             )}
 
             <div className="flex flex-wrap gap-2">
-              {connected ? (
-                <Button
-                  variant="outline"
-                  disabled={isDemo || disconnect.isPending}
-                  onClick={() => disconnect.mutate()}
-                >
-                  {disconnect.isPending && <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />}
-                  Disconnect
-                </Button>
+              {managing ? (
+                <>
+                  <Button
+                    disabled={
+                      isDemo ||
+                      connectBot.isPending ||
+                      !botToken.trim() ||
+                      (type !== "gemini" && !joinedChannels) ||
+                      (isSlack && !slackCookie.trim())
+                    }
+                    onClick={() => connectBot.mutate()}
+                  >
+                    {connectBot.isPending && <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />}
+                    Update channels
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={connectBot.isPending}
+                    onClick={cancelManage}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              ) : connected ? (
+                <>
+                  {(type === "discord" || type === "slack") && (
+                    <Button
+                      variant="outline"
+                      disabled={isDemo}
+                      onClick={() => openManage(platform?.external_id ?? null)}
+                    >
+                      Manage channels
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    disabled={isDemo || disconnect.isPending}
+                    onClick={() => disconnect.mutate()}
+                  >
+                    {disconnect.isPending && <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />}
+                    Disconnect
+                  </Button>
+                </>
               ) : (
                 <Button
                   disabled={
