@@ -22,7 +22,17 @@ type SyncResult = {
   events: number;
   skipped?: boolean;
   error?: string;
+  authExpired?: boolean;
 };
+
+// A thrown fetcher error means the stored browser/user token was rejected.
+// Discord surfaces the HTTP status in the message; Slack surfaces its error code.
+function isAuthFailure(type: string, message: string): boolean {
+  if (type === "discord") return /\((401|403)\)/.test(message);
+  if (type === "slack")
+    return /(invalid_auth|not_authed|account_inactive|token_revoked|token_expired)/.test(message);
+  return false;
+}
 
 interface PlatformRow {
   id: string;
@@ -217,11 +227,20 @@ export async function POST(request: NextRequest) {
       synced.push({ type: platform.type, ...counts });
     } catch (err) {
       // One platform failing must not abort the rest. Never surface the token.
+      const message = err instanceof Error ? err.message : "Sync failed";
+      const authExpired = isAuthFailure(platform.type, message);
+      // A rejected token won't fix itself — flip is_connected off so the UI shows
+      // "Not connected", re-exposes the token inputs, and stops re-syncing a dead
+      // token until the user reconnects.
+      if (authExpired) {
+        await db.from("platforms").update({ is_connected: false }).eq("id", platform.id);
+      }
       synced.push({
         type: platform.type,
         announcements: 0,
         events: 0,
-        error: err instanceof Error ? err.message : "Sync failed",
+        error: message,
+        authExpired,
       });
     }
   }

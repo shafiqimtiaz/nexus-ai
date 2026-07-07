@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { RefreshIcon } from "@hugeicons/core-free-icons";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { Role } from "@/lib/auth";
+
+type SyncRow = { type: string; skipped?: boolean; authExpired?: boolean };
 
 // Owner-only. On mount it fires a background sync (fire-and-forget) and refreshes
 // the server component when it resolves so fresh data appears. Demo users render
@@ -24,8 +27,16 @@ export function SyncOnLoad({ role }: { role: Role }) {
       // Skip the full server re-render when every platform was staleness-skipped
       // (nothing changed). On parse failure, refresh anyway to stay safe.
       const data = await res.json().catch(() => null);
-      const didWork =
-        !Array.isArray(data?.synced) || data.synced.some((r: { skipped?: boolean }) => !r.skipped);
+      const rows: SyncRow[] = Array.isArray(data?.synced) ? data.synced : [];
+      // A rejected token was flipped to disconnected server-side — tell the user
+      // to reconnect it in Options.
+      const expired = rows.filter((r) => r.authExpired).map((r) => r.type);
+      if (expired.length > 0) {
+        toast.error(
+          `${expired.join(" and ")} token expired. Reconnect it in Options to resume syncing.`
+        );
+      }
+      const didWork = !Array.isArray(data?.synced) || rows.some((r) => !r.skipped);
       if (didWork) router.refresh();
     } catch {
       // Fire-and-forget: a failed background sync must not disrupt the page.
