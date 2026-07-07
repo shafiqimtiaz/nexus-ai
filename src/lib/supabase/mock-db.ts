@@ -13,6 +13,7 @@ interface DbSchema {
   resources: any[];
   resource_labels: any[];
   agent_actions: any[];
+  app_settings: any[];
 }
 
 function getInitialData(): DbSchema {
@@ -174,6 +175,7 @@ function getInitialData(): DbSchema {
         created_at: new Date(Date.now() - 3.8 * 60 * 60 * 1000).toISOString(),
       },
     ],
+    app_settings: [],
   };
 }
 

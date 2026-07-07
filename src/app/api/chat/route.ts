@@ -45,11 +45,12 @@ export async function POST(request: NextRequest) {
 
   // Load custom Gemini API key from database if configured, fallback to environment key.
   const db = createServerClient();
-  const { data: geminiPlatform } = await db
-    .from("platforms")
-    .select("access_token, is_connected")
-    .eq("type", "gemini")
-    .maybeSingle();
+  const [geminiRes, rulesRes] = await Promise.all([
+    db.from("platforms").select("access_token, is_connected").eq("type", "gemini").maybeSingle(),
+    db.from("app_settings").select("value").eq("key", "ai_rules").maybeSingle(),
+  ]);
+  const geminiPlatform = geminiRes.data;
+  const customRules = rulesRes.data?.value as string | undefined;
 
   const apiKey =
     geminiPlatform?.is_connected && geminiPlatform?.access_token
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   const result = streamText({
     model: googleProvider(modelName),
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(customRules),
     messages,
     tools,
     stopWhen: stepCountIs(8),

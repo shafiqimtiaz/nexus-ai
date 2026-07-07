@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/auth";
 import { ToolCallDisplay, type ToolCall } from "./tool-call-display";
+import { Markdown } from "./markdown";
 
 type ChatMessage = {
   id: string;
@@ -294,7 +295,11 @@ export function ChatInterface({ role }: { role: Role }) {
                 {m.role === "assistant" &&
                   m.toolCalls.map((call) => <ToolCallDisplay key={call.toolCallId} call={call} />)}
                 {m.content ? (
-                  <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                  m.role === "assistant" ? (
+                    <Markdown content={m.content} />
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                  )
                 ) : m.role === "assistant" && busy ? (
                   <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
                 ) : null}

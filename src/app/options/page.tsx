@@ -1,5 +1,6 @@
 import { getRole } from "@/lib/auth";
 import { PlatformCard } from "@/components/options/platform-card";
+import { AiRulesCard } from "@/components/options/ai-rules-card";
 
 export const metadata = {
   title: "Options — Nexus",
@@ -42,6 +43,7 @@ export default async function OptionsPage() {
           description="Sync announcements and coursework from your workspace channels."
           role={role}
         />
+        <AiRulesCard role={role} />
       </div>
     </div>
   );

@@ -1,9 +1,9 @@
 // System prompt for the Nexus chat agent. A function (not a constant) so the
 // injected "today" date is fresh on every request.
-export function buildSystemPrompt(): string {
-  const today = new Date().toISOString();
 
-  return `You are Nexus, a student's academic assistant. Today is ${today}.
+// The locked base rules. Kept separate so the Options page can show them to the
+// owner read-only while their own rules are appended, never replacing these.
+export const BASE_SYSTEM_PROMPT = `You are Nexus, a student's academic assistant.
 
 You help the student stay on top of coursework: upcoming exams, assignments,
 study plans, resources, and announcements from their connected platforms
@@ -23,4 +23,19 @@ Rules:
 - All times are ISO 8601. When the student gives a relative time ("tomorrow at
   3pm"), resolve it against today's date above.
 - Be concise and friendly. Prefer short, skimmable answers.`;
+
+export function buildSystemPrompt(customRules?: string | null): string {
+  const today = new Date().toISOString();
+
+  let prompt = `${BASE_SYSTEM_PROMPT.replace(
+    "You are Nexus, a student's academic assistant.",
+    `You are Nexus, a student's academic assistant. Today is ${today}.`
+  )}`;
+
+  const trimmed = customRules?.trim();
+  if (trimmed) {
+    prompt += `\n\nAdditional user rules (these are set by the user and take precedence over the style guidance above, but never override the tool-usage rules):\n${trimmed}`;
+  }
+
+  return prompt;
 }

@@ -10,6 +10,7 @@ import {
   ArrowRight01Icon,
 } from "@hugeicons/core-free-icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { DashboardAnnouncement } from "@/lib/dashboard";
 
 const PAGE_SIZE = 5;
@@ -31,19 +32,21 @@ export function RecentAnnouncements({ items, className }: { items: DashboardAnno
   const visible = items.slice(current * PAGE_SIZE, current * PAGE_SIZE + PAGE_SIZE);
 
   return (
-    <Card className={className}>
+    <Card className={cn("h-full", className)}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={Megaphone01Icon} className="h-4 w-4 text-primary" />
           Recent announcements
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         {items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">No announcements yet.</p>
+          <p className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
+            No announcements yet.
+          </p>
         ) : (
           <>
-            <ul className="max-h-80 divide-y divide-border overflow-y-auto">
+            <ul className="flex flex-1 flex-col divide-y divide-border">
               {visible.map((item) => {
                 const body = (
                   <>
@@ -93,7 +96,10 @@ export function RecentAnnouncements({ items, className }: { items: DashboardAnno
                 );
 
                 return (
-                  <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                  <li
+                    key={item.id}
+                    className="flex flex-1 flex-col justify-center py-3 first:pt-0 last:pb-0"
+                  >
                     {item.source_url ? (
                       <a
                         href={item.source_url}
