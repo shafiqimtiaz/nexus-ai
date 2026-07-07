@@ -166,7 +166,7 @@ export function RecentAnnouncements({ items, className }: { items: DashboardAnno
                         href={item.source_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block rounded-md transition-colors hover:bg-muted/60"
+                        className="block cursor-pointer rounded-md transition-colors hover:bg-muted/60"
                       >
                         {body}
                       </a>

@@ -24,7 +24,7 @@ export function PinnedResources({ resources }: { resources: DashboardResource[] 
                   href={formatUrl(resource.url)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
+                  className="block cursor-pointer rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
                 >
                   <div className="truncate text-sm font-medium text-primary">{resource.title}</div>
                   {resource.description && (
