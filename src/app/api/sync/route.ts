@@ -548,6 +548,27 @@ Rules:
           } catch {}
         }
       }
+
+      // Title backfill: give every existing announcement a clean AI title.
+      // Idempotent — a row is only (re)titled while its title is still the raw
+      // 60-char ingestion prefix (or null); once AI-titled it's no longer a
+      // content prefix, so later syncs skip it and burn no AI calls.
+      const { data: untitled } = await db
+        .from("announcements")
+        .select("id, title, content");
+      for (const ann of (untitled ?? []) as Array<{ id: string; title: string | null; content: string }>) {
+        if (ann.title && ann.title !== deriveTitle(ann.content)) continue;
+        try {
+          const { text } = await generateText({
+            model: googleProvider("gemini-flash-lite-latest"),
+            prompt: `Generate a concise, human-readable headline (max ~8 words) for this announcement. Plain text only — no markdown, quotes, or emoji. Respond with ONLY the headline text.\n\nAnnouncement:\n"${ann.content}"`,
+          });
+          const aiTitle = sanitizeTitle(text);
+          if (aiTitle) {
+            await db.from("announcements").update({ title: aiTitle }).eq("id", ann.id);
+          }
+        } catch {}
+      }
     }
   } catch {}
 
