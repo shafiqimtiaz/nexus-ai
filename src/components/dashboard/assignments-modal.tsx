@@ -77,7 +77,7 @@ export function AssignmentsModal({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="sm:max-w-5xl !duration-0 data-open:animate-none data-closed:animate-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HugeiconsIcon icon={ClipboardListIcon} className="h-5 w-5 text-primary" />
