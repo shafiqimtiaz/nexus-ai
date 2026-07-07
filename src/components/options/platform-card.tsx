@@ -294,9 +294,14 @@ export function PlatformCard({
                           ? `${window.location.origin}/api/auth/google/callback`
                           : "http://localhost:3000/api/auth/google/callback"}
                       </code>
-                      <p className="text-[10px] text-muted-foreground mt-1.5">
-                        Add this in Google Cloud Console &gt; Credentials &gt; OAuth 2.0 Client IDs.
-                      </p>
+                      <div className="mt-3 text-[10px] text-muted-foreground space-y-1.5 border-t pt-2 border-border/50">
+                        <p className="font-medium text-foreground text-xs">How to configure Google Classroom:</p>
+                        <ul className="list-disc pl-4 space-y-1">
+                          <li>Go to Google Cloud Console, create a project, and enable the Google Classroom API.</li>
+                          <li>Configure your OAuth consent screen and add the Redirect URI above to your Authorized Redirect URIs.</li>
+                          <li>Create OAuth 2.0 Client ID credentials, then paste the Client ID and Secret here.</li>
+                        </ul>
+                      </div>
                     </div>
                   </>
                 ) : (
@@ -332,76 +337,124 @@ export function PlatformCard({
         ) : (
           <div className="space-y-3">
             {!connected && (
-              <div
-                className={cn("grid gap-3", type === "gemini" ? "grid-cols-1" : "sm:grid-cols-2")}
-              >
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="bot-token"
-                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                  >
-                    <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
-                    {type === "gemini"
-                      ? "Gemini API Key"
-                      : isSlack
-                        ? "Token (xoxc-...)"
-                        : "User token"}
-                  </label>
-                  <Input
-                    id="bot-token"
-                    type="password"
-                    autoComplete="off"
-                    placeholder={
-                      type === "gemini"
-                        ? "AIzaSy..."
-                        : isSlack
-                          ? "xoxc-..."
-                          : "Your Discord user token"
-                    }
-                    value={botToken}
-                    disabled={isDemo || connectBot.isPending}
-                    onChange={(e) => setBotToken(e.target.value)}
-                  />
-                </div>
-                {isSlack && (
+              <>
+                <div
+                  className={cn("grid gap-3", type === "gemini" ? "grid-cols-1" : "sm:grid-cols-2")}
+                >
                   <div className="space-y-1.5">
                     <label
-                      htmlFor="slack-cookie"
+                      htmlFor="bot-token"
                       className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
                     >
                       <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
-                      d cookie (xoxd-...)
+                      {type === "gemini"
+                        ? "Gemini API Key"
+                        : isSlack
+                          ? "Token (xoxc-...)"
+                          : "User token"}
                     </label>
                     <Input
-                      id="slack-cookie"
+                      id="bot-token"
                       type="password"
                       autoComplete="off"
-                      placeholder="xoxd-..."
-                      value={slackCookie}
+                      placeholder={
+                        type === "gemini"
+                          ? "AIzaSy..."
+                          : isSlack
+                            ? "xoxc-..."
+                            : "Your Discord user token"
+                      }
+                      value={botToken}
                       disabled={isDemo || connectBot.isPending}
-                      onChange={(e) => setSlackCookie(e.target.value)}
+                      onChange={(e) => setBotToken(e.target.value)}
                     />
                   </div>
-                )}
-                {type !== "gemini" && (
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="bot-channel"
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                  {isSlack && (
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="slack-cookie"
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                      >
+                        <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
+                        d cookie (xoxd-...)
+                      </label>
+                      <Input
+                        id="slack-cookie"
+                        type="password"
+                        autoComplete="off"
+                        placeholder="xoxd-..."
+                        value={slackCookie}
+                        disabled={isDemo || connectBot.isPending}
+                        onChange={(e) => setSlackCookie(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {type !== "gemini" && (
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="bot-channel"
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+                      >
+                        <HugeiconsIcon icon={HashIcon} className="h-3.5 w-3.5" />
+                        Channel ID
+                      </label>
+                      <Input
+                        id="bot-channel"
+                        placeholder={isSlack ? "C12345678" : "123456789012345678"}
+                        value={channelId}
+                        disabled={isDemo || connectBot.isPending}
+                        onChange={(e) => setChannelId(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {type === "gemini" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Get an API key from the{" "}
+                    <a
+                      href="https://aistudio.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline font-medium"
                     >
-                      <HugeiconsIcon icon={HashIcon} className="h-3.5 w-3.5" />
-                      Channel ID
-                    </label>
-                    <Input
-                      id="bot-channel"
-                      placeholder={isSlack ? "C12345678" : "123456789012345678"}
-                      value={channelId}
-                      disabled={isDemo || connectBot.isPending}
-                      onChange={(e) => setChannelId(e.target.value)}
-                    />
+                      Google AI Studio
+                    </a>
+                    .
+                  </p>
+                )}
+
+                {type === "discord" && (
+                  <div className="rounded-md border bg-muted/20 p-3 text-[10px] text-muted-foreground space-y-1.5">
+                    <p className="font-medium text-foreground text-xs">How to configure Discord:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        <strong>User token:</strong> Open Discord in your web browser, press F12, inspect any API request under the Network tab, and copy the <code>authorization</code> header value. <em>Keep this token private!</em>
+                      </li>
+                      <li>
+                        <strong>Channel ID:</strong> Enable Developer Mode in Discord Settings &gt; Advanced, right-click the channel, and choose <strong>Copy Channel ID</strong>.
+                      </li>
+                    </ul>
                   </div>
                 )}
-              </div>
+
+                {type === "slack" && (
+                  <div className="rounded-md border bg-muted/20 p-3 text-[10px] text-muted-foreground space-y-1.5">
+                    <p className="font-medium text-foreground text-xs">How to configure Slack:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li>
+                        <strong>Token (xoxc-...):</strong> Open Slack in your web browser, press F12, inspect any request under the Network tab, and copy the token starting with <code>xoxc-</code> in the request payload or response.
+                      </li>
+                      <li>
+                        <strong>d cookie (xoxd-...):</strong> In browser Developer Tools, go to Application &gt; Cookies &gt; slack.com, and copy the value of the <code>d</code> cookie.
+                      </li>
+                      <li>
+                        <strong>Channel ID:</strong> Right-click the channel name in Slack, click &apos;View channel details&apos;, and copy the ID at the bottom.
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </>
             )}
 
             <div className="flex flex-wrap gap-2">

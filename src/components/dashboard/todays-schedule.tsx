@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EventBadge } from "@/components/dashboard/event-badge";
 import type { DashboardEvent } from "@/lib/dashboard";
 
-export function TodaysSchedule({ events }: { events: DashboardEvent[] }) {
+export function TodaysSchedule({ events, className }: { events: DashboardEvent[]; className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={CalendarCheckIcon} className="h-4 w-4 text-primary" />

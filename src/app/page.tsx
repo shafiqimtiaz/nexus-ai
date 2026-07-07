@@ -33,21 +33,13 @@ export default async function DashboardPage() {
       <QuickStats stats={data.stats} />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <UpcomingEvents events={data.upcomingEvents} />
-        </div>
-        <div>
-          <TodaysSchedule events={data.todaysSchedule} />
-        </div>
+        <UpcomingEvents events={data.upcomingEvents} className="lg:col-span-2" />
+        <TodaysSchedule events={data.todaysSchedule} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentAnnouncements items={data.recentAnnouncements} />
-        </div>
-        <div>
-          <AgentActions items={data.agentActions} />
-        </div>
+        <RecentAnnouncements items={data.recentAnnouncements} className="lg:col-span-2" />
+        <AgentActions items={data.agentActions} />
       </div>
 
       <div>

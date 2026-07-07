@@ -4,9 +4,9 @@ import { ExternalLinkIcon, Megaphone01Icon } from "@hugeicons/core-free-icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardAnnouncement } from "@/lib/dashboard";
 
-export function RecentAnnouncements({ items }: { items: DashboardAnnouncement[] }) {
+export function RecentAnnouncements({ items, className }: { items: DashboardAnnouncement[]; className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={Megaphone01Icon} className="h-4 w-4 text-primary" />

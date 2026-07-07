@@ -4,9 +4,9 @@ import { Calendar03Icon, Link02Icon, RefreshIcon, SparklesIcon } from "@hugeicon
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardAgentAction } from "@/lib/dashboard";
 
-export function AgentActions({ items }: { items: DashboardAgentAction[] }) {
+export function AgentActions({ items, className }: { items: DashboardAgentAction[]; className?: string }) {
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4 text-amber-500 animate-pulse" />
