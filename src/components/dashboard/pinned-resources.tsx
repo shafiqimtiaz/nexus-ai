@@ -6,7 +6,7 @@ import { formatUrl } from "@/lib/utils";
 
 export function PinnedResources({ resources }: { resources: DashboardResource[] }) {
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={PinIcon} className="h-4 w-4 text-primary" />
