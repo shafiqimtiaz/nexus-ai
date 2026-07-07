@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Label, Resource } from "@/components/resources/resources-view";
-import { cn } from "@/lib/utils";
+import { cn, formatUrl } from "@/lib/utils";
 
 const inputClass =
   "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
@@ -89,7 +89,7 @@ export function ResourceForm({
     mutationFn: async () => {
       const payload = {
         title: title.trim(),
-        url: url.trim(),
+        url: formatUrl(url.trim()),
         description: description.trim() || null,
         labelIds: Array.from(selected),
       };

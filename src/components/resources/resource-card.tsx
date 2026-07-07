@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Label, Resource } from "@/components/resources/resources-view";
-import { cn } from "@/lib/utils";
+import { cn, formatUrl } from "@/lib/utils";
 
 // Soft-tinted badge from a hex color: a translucent fill with the color as text.
 // Falls back to muted styling when no color is set.
@@ -93,7 +93,7 @@ export function ResourceCard({
       <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
         <CardTitle className="min-w-0 text-base leading-snug">
           <a
-            href={resource.url}
+            href={formatUrl(resource.url)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-primary hover:underline"

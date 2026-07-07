@@ -2,6 +2,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { PinIcon } from "@hugeicons/core-free-icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardResource } from "@/lib/dashboard";
+import { formatUrl } from "@/lib/utils";
 
 export function PinnedResources({ resources }: { resources: DashboardResource[] }) {
   return (
@@ -20,7 +21,7 @@ export function PinnedResources({ resources }: { resources: DashboardResource[] 
             {resources.map((resource) => (
               <li key={resource.id}>
                 <a
-                  href={resource.url}
+                  href={formatUrl(resource.url)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block rounded-md px-2 py-1.5 transition-colors hover:bg-muted/60"
