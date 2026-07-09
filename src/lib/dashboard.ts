@@ -101,7 +101,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       .order("start_time", { ascending: true }),
     db
       .from("events")
-      .select("start_time")
+      .select("id, title, event_type, start_time, end_time")
       .eq("event_type", "exam")
       .gte("start_time", nowIso)
       .order("start_time", { ascending: true })
@@ -145,8 +145,21 @@ export async function getDashboardData(): Promise<DashboardData> {
     ? Math.max(0, differenceInCalendarDays(new Date(nextExamRes.data.start_time), now))
     : null;
 
+  // Merge the nearest future exam into the upcoming list even when it falls
+  // outside the 7-day window, so the list stays consistent with the
+  // "Days to next exam" stat (which counts any future exam). Dedupe by id in
+  // case the exam is already within the window.
+  const upcoming = (upcomingRes.data ?? []) as DashboardEvent[];
+  const nextExam = (nextExamRes.data ?? null) as DashboardEvent | null;
+  if (nextExam && !upcoming.some((e) => e.id === nextExam.id)) {
+    upcoming.push(nextExam);
+    upcoming.sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
+  }
+
   return {
-    upcomingEvents: (upcomingRes.data ?? []) as DashboardEvent[],
+    upcomingEvents: upcoming,
     todaysSchedule: (todayRes.data ?? []) as DashboardEvent[],
     stats: {
       daysToNextExam,
