@@ -413,7 +413,8 @@ export class MockSupabaseQueryBuilder {
                 row.source_external_id) ||
               (row.is_auto_detected &&
                 item.is_auto_detected &&
-                item.title === row.title &&
+                !!row.description &&
+                item.description === row.description &&
                 item.start_time === row.start_time &&
                 item.event_type === row.event_type)
           );
