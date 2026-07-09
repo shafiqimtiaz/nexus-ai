@@ -3,12 +3,16 @@
 // Background: typescript@7 is a native compiler that ships NO programmatic API
 // (require("typescript") exposes only `version`). The `tsc` binary shells out to a
 // native executable and is unaffected by this script. However, JS tooling such as
-// typescript-eslint needs the full v6 Node API via require("typescript").
+// typescript-eslint (and Next.js's build-time type checker) needs the full v6 Node
+// API via require("typescript").
 //
-// This script keeps the native v7 `tsc` binary intact and merely repoints the
-// package's main entry (".") at a shim that re-exports the v6 API provided by
-// @typescript/old (installed as a dependency of @typescript/typescript6). That lets
-// ESLint run on v6 while `tsc --noEmit` / `next build` type-check with v7.
+// This script keeps the native v7 `tsc` binary intact and writes a `lib/typescript.js`
+// shim that re-exports the v6 API provided by @typescript/old (a dependency of
+// @typescript/typescript6). Two consumers need this:
+//   - Next.js's dependency check looks for the physical file `typescript/lib/typescript.js`
+//     (exportsRestrict mode), so the file must exist on disk.
+//   - require("typescript") / the `typescript` main entry must return the v6 API.
+// The shim satisfies both. `tsc --noEmit` / `next build` still compile with the v7 binary.
 //
 // It is idempotent and safe to run on every install via the "postinstall" script.
 
@@ -38,16 +42,20 @@ function main() {
     return;
   }
 
-  const shimPath = resolve(projectRoot, "node_modules/typescript/lib/eslint-typescript.cjs");
+  // Next.js's dependency check requires the physical file `typescript/lib/typescript.js`
+  // to exist (it resolves it directly, not via the package exports map). v7 does not
+  // ship this file, so we create it as a shim re-exporting the v6 API. This same file
+  // also serves as the package's main entry (".").
+  const shimPath = resolve(projectRoot, "node_modules/typescript/lib/typescript.js");
   mkdirSync(dirname(shimPath), { recursive: true });
   writeFileSync(shimPath, 'module.exports = require("@typescript/old");\n');
 
   const exports = tsPkg.exports || (tsPkg.exports = {});
-  if (exports["."] === "./lib/eslint-typescript.cjs") return; // Already spliced.
+  if (exports["."] === "./lib/typescript.js") return; // Already spliced.
 
   // Preserve every other export/subpath (e.g. ./unstable/*) and the "imports" map
   // that `tsc` relies on (#getExePath); only repoint the main entry.
-  exports["."] = "./lib/eslint-typescript.cjs";
+  exports["."] = "./lib/typescript.js";
   writeFileSync(tsPkgPath, JSON.stringify(tsPkg, null, 2) + "\n");
 
   console.log(
