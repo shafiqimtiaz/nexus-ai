@@ -596,15 +596,23 @@ Rules:
                 : [];
             const rawKeyDates: any[] = Array.isArray(result.key_dates) ? result.key_dates : [];
 
-            // Only schedule upcoming, well-formed events. Capture an optional
-            // end_time when the model supplied a valid, later timestamp.
+            // Schedule well-formed events. Exams/quizzes/study blocks are only
+            // useful when upcoming, but assignment deadlines are tracked as
+            // academic workload and must be captured regardless of whether the
+            // due date is in the past or future — so assignment-typed events
+            // bypass the future-only gate (there is intentionally NO date cap).
             const events = rawEvents
-              .filter((e) => e && typeof e.start_time === "string" && isFutureDate(e.start_time))
+              .filter((e) => {
+                if (!e || typeof e.start_time !== "string") return false;
+                if (e.event_type === "assignment") return true;
+                return isFutureDate(e.start_time);
+              })
               .map((e) => {
                 const endRaw = typeof e.end_time === "string" ? e.end_time.trim() : "";
                 const endMs = endRaw ? new Date(endRaw).getTime() : NaN;
                 const startMs = new Date(e.start_time).getTime();
-                const end_time = !Number.isNaN(endMs) && endMs > startMs ? endRaw : null;
+                const end_time =
+                  !Number.isNaN(endMs) && endMs > startMs ? endRaw : null;
                 return { ...e, end_time };
               });
 

@@ -116,13 +116,11 @@ export async function getDashboardData(): Promise<DashboardData> {
     db
       .from("events")
       .select("id", { count: "exact", head: true })
-      .eq("event_type", "assignment")
-      .gte("start_time", nowIso),
+      .eq("event_type", "assignment"),
     db
       .from("events")
       .select("id, title, description, event_type, start_time, end_time, source_platform")
       .eq("event_type", "assignment")
-      .gte("start_time", nowIso)
       .order("start_time", { ascending: true })
       .limit(20),
     db
