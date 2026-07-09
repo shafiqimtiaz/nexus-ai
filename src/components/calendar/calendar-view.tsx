@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EventBadge } from "@/components/dashboard/event-badge";
 import { EventForm } from "@/components/calendar/event-form";
+import { DayEventsDialog } from "@/components/calendar/day-events-dialog";
 import type { EventType } from "@/lib/dashboard";
 import type { Role } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,11 @@ async function fetchUpcoming(): Promise<CalendarEvent[]> {
   return json.events ?? [];
 }
 
-type DialogState = { mode: "create"; date: Date } | { mode: "edit"; event: CalendarEvent } | null;
+type DialogState =
+  | { mode: "create"; date: Date }
+  | { mode: "edit"; event: CalendarEvent }
+  | { mode: "day"; date: Date; events: CalendarEvent[] }
+  | null;
 
 export function CalendarView({ role }: { role: Role }) {
   // Demo is now editable too (its writes are isolated to the mock DB).
@@ -177,7 +182,11 @@ export function CalendarView({ role }: { role: Role }) {
                   return (
                     <div
                       key={key}
-                      onClick={canEdit ? () => setDialog({ mode: "create", date: day }) : undefined}
+                      onClick={
+                        canEdit
+                          ? () => setDialog({ mode: "day", date: day, events: dayEvents })
+                          : undefined
+                      }
                       className={cn(
                         "min-h-24 border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0",
                         !inMonth && "bg-muted/30 text-muted-foreground",
@@ -278,7 +287,20 @@ export function CalendarView({ role }: { role: Role }) {
         </div>
       </div>
 
-      {canEdit && dialog && (
+      {canEdit && dialog && dialog.mode === "day" && (
+        <DayEventsDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setDialog(null);
+          }}
+          date={dialog.date}
+          events={dialog.events}
+          onEdit={(ev) => setDialog({ mode: "edit", event: ev })}
+          onAdd={() => setDialog({ mode: "create", date: dialog.date })}
+        />
+      )}
+
+      {canEdit && dialog && dialog.mode !== "day" && (
         <EventForm
           open
           onOpenChange={(open) => {
