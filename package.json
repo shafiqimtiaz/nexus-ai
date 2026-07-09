@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "format": "prettier --write .",
-    "test": "vitest run"
+    "format": "prettier --write ."
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.8",
@@ -44,7 +43,6 @@
     "eslint-config-next": "16.2.10",
     "prettier": "^3.9.4",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "vitest": "^1.6.1"
+    "typescript": "^5"
   }
 }
