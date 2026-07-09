@@ -78,13 +78,11 @@ function sanitizeTitle(raw: unknown): string | null {
   return cleaned ? cleaned.slice(0, 80) : null;
 }
 
-// Strip HTML tags, platform mentions (Discord <@&...>, Slack <@U...>),
-// collapse whitespace. Applied at ingestion so raw content never hits the DB.
+// Strip platform mentions only (Discord <@&...>, Slack <@U...>).
+// Leave HTML, emails, code, etc. intact.
 function sanitizeContent(raw: string): string {
   return raw
-    .replace(/<[^>]+>/g, "")
     .replace(/<@[!&]?\d+>/g, "")
-    .replace(/\s+/g, " ")
     .trim();
 }
 
