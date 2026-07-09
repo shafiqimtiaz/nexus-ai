@@ -42,20 +42,27 @@ function main() {
     return;
   }
 
+  // The package is `"type": "module"`, so `.js` files are treated as ESM. We therefore
+  // use a `.cjs` shim for the loadable v6 API and point the main entry (".") at it.
+  const cjsShimPath = resolve(projectRoot, "node_modules/typescript/lib/eslint-typescript.cjs");
+  mkdirSync(dirname(cjsShimPath), { recursive: true });
+  writeFileSync(cjsShimPath, 'module.exports = require("@typescript/old");\n');
+
   // Next.js's dependency check requires the physical file `typescript/lib/typescript.js`
-  // to exist (it resolves it directly, not via the package exports map). v7 does not
-  // ship this file, so we create it as a shim re-exporting the v6 API. This same file
-  // also serves as the package's main entry (".").
-  const shimPath = resolve(projectRoot, "node_modules/typescript/lib/typescript.js");
-  mkdirSync(dirname(shimPath), { recursive: true });
-  writeFileSync(shimPath, 'module.exports = require("@typescript/old");\n');
+  // to exist (it resolves it directly), and `runTypeCheck` then loads it via require().
+  // v7 does not ship this file, so we create it as an ESM module that re-exports the
+  // same v6 API. (In a `type: module` package a `.js` must be valid ESM, hence the
+  // re-export of the `.cjs` shim rather than a `module.exports` statement.)
+  const jsShimPath = resolve(projectRoot, "node_modules/typescript/lib/typescript.js");
+  mkdirSync(dirname(jsShimPath), { recursive: true });
+  writeFileSync(jsShimPath, 'export * from "./eslint-typescript.cjs";\nexport { default } from "./eslint-typescript.cjs";\n');
 
   const exports = tsPkg.exports || (tsPkg.exports = {});
-  if (exports["."] === "./lib/typescript.js") return; // Already spliced.
+  if (exports["."] === "./lib/eslint-typescript.cjs") return; // Already spliced.
 
   // Preserve every other export/subpath (e.g. ./unstable/*) and the "imports" map
   // that `tsc` relies on (#getExePath); only repoint the main entry.
-  exports["."] = "./lib/typescript.js";
+  exports["."] = "./lib/eslint-typescript.cjs";
   writeFileSync(tsPkgPath, JSON.stringify(tsPkg, null, 2) + "\n");
 
   console.log(
