@@ -81,7 +81,7 @@ export function RecentAnnouncements({ items, className }: { items: DashboardAnno
   }, [hasMore, filtered.length]);
 
   return (
-    <Card className={cn("h-full", className)}>
+    <Card className={cn(className)}>
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
