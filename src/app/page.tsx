@@ -2,6 +2,7 @@ import { getRole } from "@/lib/auth";
 import { getDashboardData } from "@/lib/dashboard";
 import { QuickStats } from "@/components/dashboard/quick-stats";
 import { UpcomingEvents } from "@/components/dashboard/upcoming-events";
+import { UpcomingDeadlines } from "@/components/dashboard/upcoming-deadlines";
 import { TodaysSchedule } from "@/components/dashboard/todays-schedule";
 import { RecentAnnouncements } from "@/components/dashboard/recent-announcements";
 import { PinnedResources } from "@/components/dashboard/pinned-resources";
@@ -33,12 +34,18 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-6 lg:flex-row">
         {/* Main content */}
         <div className="min-w-0 flex-1 space-y-6">
-          <QuickStats stats={data.stats} assignments={data.upcomingAssignmentEvents} />
+          <QuickStats
+            stats={data.stats}
+            assignments={data.upcomingAssignmentEvents}
+            exams={data.upcomingEvents}
+          />
 
           <div className="grid gap-6 lg:grid-cols-3">
             <UpcomingEvents events={data.upcomingEvents} className="lg:col-span-2" />
             <TodaysSchedule events={data.todaysSchedule} />
           </div>
+
+          <UpcomingDeadlines events={data.upcomingAssignmentEvents} />
 
           <div className="grid gap-6 lg:grid-cols-3">
             <RecentAnnouncements items={data.recentAnnouncements} className="lg:col-span-2" />

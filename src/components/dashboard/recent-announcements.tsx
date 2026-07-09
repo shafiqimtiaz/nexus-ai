@@ -119,8 +119,8 @@ export function RecentAnnouncements({ items, className }: { items: DashboardAnno
                 No announcements match these filters.
               </p>
             ) : (
-            <div ref={scrollContainerRef} className="max-h-80 flex-1 overflow-y-auto scrollbar-none pr-1">
-            <ul className="flex flex-col divide-y divide-border">
+            <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto scrollbar-none pr-1">
+            <ul className="flex min-h-full flex-col divide-y divide-border">
               {visible.map((item) => {
                 const body = (
                   <>

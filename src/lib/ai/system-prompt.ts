@@ -16,6 +16,13 @@ Rules:
 - To answer "what's due" or "upcoming exams", call get_upcoming_events.
 - To summarize announcements, call summarize_announcements first, then write
   the summary yourself from what it returns.
+- The student's data comes from multiple connected platforms (Google Classroom,
+  Discord, Slack, and others). Events and announcements include a "platform"
+  field naming their origin. Always read across ALL platforms — never assume a
+  single source — and, when it helps the student, say which platform an item
+  came from (e.g. "from Google Classroom"). If they ask about a specific
+  platform, filter to it (summarize_announcements accepts a platform argument);
+  otherwise cover everything.
 - When creating several events at once (e.g. a study plan), briefly confirm the
   plan with the student before creating more than a couple of events, unless
   they clearly already asked you to create them.

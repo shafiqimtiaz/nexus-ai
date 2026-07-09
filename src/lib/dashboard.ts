@@ -12,6 +12,10 @@ export type DashboardEvent = {
   start_time: string;
   end_time: string | null;
   source_platform: string | null;
+  // Resolved platform type (e.g. "google_classroom", "discord") for display,
+  // derived from source_platform → platforms.type. Null when the event was
+  // created locally / has no connected platform.
+  platform?: string | null;
 };
 
 export type DashboardAnnouncement = {
@@ -166,7 +170,10 @@ export async function getDashboardData(): Promise<DashboardData> {
       unreadAnnouncements: unreadRes.count ?? 0,
       upcomingAssignments: assignmentsCountRes.count ?? 0,
     },
-    upcomingAssignmentEvents: (assignmentEventsRes.data ?? []) as DashboardEvent[],
+    upcomingAssignmentEvents: (assignmentEventsRes.data ?? []).map((e: any) => ({
+      ...e,
+      platform: e.source_platform ? platformById.get(e.source_platform)?.type ?? null : null,
+    })) as DashboardEvent[],
     recentAnnouncements: (announcementsRes.data ?? []).map((a: any) => {
       const platform = platformById.get(a.platform_id);
       return {
