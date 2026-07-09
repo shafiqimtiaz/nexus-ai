@@ -385,9 +385,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ==========================================
-  // AUTONOMOUS CONCIERGE AGENT PROCESSING LAYER
-  // ==========================================
   try {
     const { data: geminiPlatform } = await db
       .from("platforms")
@@ -403,7 +400,6 @@ export async function POST(request: NextRequest) {
     if (apiKey) {
       const googleProvider = createGoogle({ apiKey });
 
-      // Fetch the last 5 announcements
       const { data: anns } = await db
         .from("announcements")
         .select("id, content, announced_at, platform_id")
