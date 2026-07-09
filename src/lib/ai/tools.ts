@@ -25,6 +25,16 @@ function fail(context: string, message: string) {
   return { error: `${context}: ${message}` };
 }
 
+// Map platforms.id → platforms.type so events/announcements (which store the
+// platform id in source_platform/platform_id) can report a readable platform
+// origin to the model. Returns an empty map if the lookup fails.
+async function getPlatformTypeMap(
+  db: ReturnType<typeof createServerClient>
+): Promise<Map<string, string>> {
+  const { data } = await db.from("platforms").select("id, type");
+  return new Map((data ?? []).map((p: any) => [p.id, p.type]));
+}
+
 // Push a freshly-created local event to Google Calendar and store the returned
 // id back on the row (source_external_id = gcal:<id>) so later edits/deletes and
 // the import reconcile can match it. No-op when Google isn't connected.
@@ -55,7 +65,7 @@ export function getLocalTools(): Record<string, Tool> {
   return {
     get_upcoming_events: tool({
       description:
-        "List upcoming events (exams, quizzes, assignments, study blocks) that start within the next N days, soonest first. Use this to answer 'what's due', 'what's coming up', or 'what exams do I have'.",
+        "List upcoming events (exams, quizzes, assignments, study blocks) that start within the next N days, soonest first. Each event includes the `platform` it was detected/synced from (e.g. 'google_classroom', 'discord') or null if created locally. Use this to answer 'what's due', 'what's coming up', or 'what exams do I have', and to tell the student which platform an item came from.",
       inputSchema: z.object({
         days: z
           .number()
@@ -72,13 +82,25 @@ export function getLocalTools(): Record<string, Tool> {
 
         const { data, error } = await db
           .from("events")
-          .select(EVENT_COLUMNS)
+          .select(`${EVENT_COLUMNS}, source_platform`)
           .gte("start_time", now.toISOString())
           .lte("start_time", until.toISOString())
           .order("start_time", { ascending: true });
 
         if (error) return fail("get_upcoming_events", error.message);
-        return { count: data?.length ?? 0, events: data ?? [] };
+
+        // Resolve source_platform (a platforms.id) → human platform type so the
+        // model can name the origin platform for each event.
+        const platformById = await getPlatformTypeMap(db);
+        const events = (data ?? []).map((e: any) => {
+          const { source_platform, ...rest } = e;
+          return {
+            ...rest,
+            platform: source_platform ? platformById.get(source_platform) ?? null : null,
+          };
+        });
+
+        return { count: events.length, events };
       },
     }),
 
@@ -334,7 +356,7 @@ export function getLocalTools(): Record<string, Tool> {
 
     summarize_announcements: tool({
       description:
-        "Fetch recent announcements from connected platforms (from the local cache). Returns their text so YOU can summarize it in your reply. Use when the student asks what's new or to summarize announcements.",
+        "Fetch recent announcements from connected platforms (from the local cache). Each announcement includes the `platform` it came from (e.g. 'google_classroom', 'discord'). Returns their text so YOU can summarize it in your reply. Use when the student asks what's new or to summarize announcements, and mention which platform each update came from when relevant.",
       inputSchema: z.object({
         limit: z
           .number()
@@ -342,17 +364,37 @@ export function getLocalTools(): Record<string, Tool> {
           .positive()
           .optional()
           .describe("Max announcements to fetch. Defaults to 10."),
+        platform: z
+          .string()
+          .optional()
+          .describe(
+            "Optional platform type to filter by (e.g. 'google_classroom', 'discord', 'slack'). Omit to fetch from all platforms."
+          ),
       }),
-      execute: async ({ limit }) => {
+      execute: async ({ limit, platform }) => {
         const db = createServerClient();
         const { data, error } = await db
           .from("announcements")
-          .select("id, title, content, author, source_url, announced_at")
+          .select("id, title, content, author, source_url, announced_at, platform_id")
           .order("announced_at", { ascending: false, nullsFirst: false })
           .limit(limit ?? 10);
 
         if (error) return fail("summarize_announcements", error.message);
-        return { count: data?.length ?? 0, announcements: data ?? [] };
+
+        const platformById = await getPlatformTypeMap(db);
+        let announcements = (data ?? []).map((a: any) => {
+          const { platform_id, ...rest } = a;
+          return {
+            ...rest,
+            platform: platform_id ? platformById.get(platform_id) ?? null : null,
+          };
+        });
+
+        if (platform) {
+          announcements = announcements.filter((a: any) => a.platform === platform);
+        }
+
+        return { count: announcements.length, announcements };
       },
     }),
 
