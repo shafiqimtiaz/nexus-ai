@@ -10,6 +10,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { AssignmentsModal } from "@/components/dashboard/assignments-modal";
 import { AnnouncementsModal } from "@/components/dashboard/announcements-modal";
+import { ExamsModal } from "@/components/dashboard/exams-modal";
 import type { DashboardData, DashboardEvent } from "@/lib/dashboard";
 
 function Stat({
@@ -57,12 +58,15 @@ function Stat({
 export function QuickStats({
   stats,
   assignments,
+  exams,
 }: {
   stats: DashboardData["stats"];
   assignments: DashboardEvent[];
+  exams: DashboardEvent[];
 }) {
   const [assignmentsOpen, setAssignmentsOpen] = useState(false);
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [examsOpen, setExamsOpen] = useState(false);
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -82,6 +86,7 @@ export function QuickStats({
                 ? "Day to next exam"
                 : "Days to next exam"
           }
+          onClick={exams.length > 0 ? () => setExamsOpen(true) : undefined}
         />
         <Stat
           icon={Notification03Icon}
@@ -107,6 +112,8 @@ export function QuickStats({
         open={announcementsOpen}
         onOpenChange={setAnnouncementsOpen}
       />
+
+      <ExamsModal open={examsOpen} onOpenChange={setExamsOpen} exams={exams} />
     </>
   );
 }
