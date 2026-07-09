@@ -305,8 +305,8 @@ async function syncSlack(
       )
     )
   ).flat().filter((m) => {
-    if (m.subtype === "channel_join" || m.subtype === "channel_leave") return false;
     if (/has (joined|left) the channel/i.test(m.content)) return false;
+    if (/New member joined the channel/i.test(m.content)) return false;
     return true;
   });
 
