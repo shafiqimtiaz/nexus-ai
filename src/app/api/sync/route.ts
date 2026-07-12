@@ -7,12 +7,7 @@ import { isJoinLeaveMessage } from "@/lib/utils";
 import { listAnnouncements, listAssignments } from "../../../../mcp/classroom/tools";
 import { createGoogle } from "@ai-sdk/google";
 import { generateText } from "ai";
-import {
-  writeToGoogleCalendar,
-  listGoogleCalendarEvents,
-  gcalExternalId,
-  parseGcalId,
-} from "@/lib/auth/google-oauth";
+import { writeToGoogleCalendar } from "@/lib/auth/google-oauth";
 
 const STALE_MS = 15 * 60 * 1000;
 
@@ -157,91 +152,17 @@ async function upsertAnnouncements(
   return rows.length;
 }
 
-const IMPORT_WINDOW_PAST_MS = 30 * 24 * 60 * 60 * 1000;
-const IMPORT_WINDOW_FUTURE_MS = 90 * 24 * 60 * 60 * 1000;
-
-async function syncGoogleCalendar(
-  db: ReturnType<typeof createServerClient>,
-  platformId: string
-): Promise<number> {
-  const now = Date.now();
-  const timeMin = new Date(now - IMPORT_WINDOW_PAST_MS).toISOString();
-  const timeMax = new Date(now + IMPORT_WINDOW_FUTURE_MS).toISOString();
-  const timeMinMs = now - IMPORT_WINDOW_PAST_MS;
-  const timeMaxMs = now + IMPORT_WINDOW_FUTURE_MS;
-
-  const googleEvents = await listGoogleCalendarEvents(timeMin, timeMax);
-  const googleIds = new Set(googleEvents.map((e) => e.id));
-  let touched = 0;
-
-  const { data: platformRows } = await db
+// Export-only mirror: push user-created events (no platform identity, no gcal
+// mapping yet) to Google Calendar. Nexus is the source of truth; nothing is
+// imported back and nothing local is ever deleted because of Google.
+async function pushLocalEventsToGoogle(db: ReturnType<typeof createServerClient>): Promise<number> {
+  let pushed = 0;
+  const { data: rows } = await db
     .from("events")
-    .select("id, source_external_id, event_type, start_time")
-    .eq("source_platform", platformId);
-  const localGcal = (platformRows ?? []).filter((r: any) => parseGcalId(r.source_external_id));
-  const localByGid = new Map<string, any>(
-    localGcal.map((r: any) => [parseGcalId(r.source_external_id) as string, r])
-  );
-
-  const { data: contentRows } = await db.from("events").select("title, event_type, start_time");
-  const contentKey = (
-    title: string | null,
-    eventType: string | null,
-    start: string | null
-  ): string => {
-    const ms = start ? new Date(start).getTime() : NaN;
-    return `${ms} ${eventType ?? ""} ${normalizeEventTitle(title)}`;
-  };
-  const seenContent = new Set<string>(
-    (contentRows ?? []).map((r: any) => contentKey(r.title, r.event_type, r.start_time))
-  );
-
-  for (const ev of googleEvents) {
-    if (!ev.startTime) continue;
-    const existing = localByGid.get(ev.id);
-    if (existing) {
-      await db
-        .from("events")
-        .update({
-          title: ev.summary,
-          description: ev.description,
-          start_time: ev.startTime,
-          end_time: ev.endTime,
-        })
-        .eq("id", existing.id);
-    } else {
-      const key = contentKey(ev.summary, classifyEventType(ev.summary), ev.startTime);
-      if (seenContent.has(key)) continue;
-      await db.from("events").insert({
-        title: ev.summary,
-        description: ev.description,
-        event_type: classifyEventType(ev.summary),
-        start_time: ev.startTime,
-        end_time: ev.endTime,
-        source_platform: platformId,
-        source_external_id: gcalExternalId(ev.id),
-        is_auto_detected: true,
-      });
-      seenContent.add(key);
-    }
-    touched++;
-  }
-
-  for (const r of localGcal) {
-    const startMs = r.start_time ? new Date(r.start_time).getTime() : NaN;
-    if (Number.isNaN(startMs) || startMs < timeMinMs || startMs > timeMaxMs) continue;
-    const gid = parseGcalId(r.source_external_id) as string;
-    if (!googleIds.has(gid)) {
-      await db.from("events").delete().eq("id", r.id);
-      touched++;
-    }
-  }
-
-  const { data: allEvents } = await db
-    .from("events")
-    .select("id, title, start_time, end_time, description, source_external_id");
-  for (const r of (allEvents ?? []) as any[]) {
-    if (r.source_external_id || !r.start_time) continue;
+    .select("id, title, start_time, end_time, description, source_external_id, gcal_event_id")
+    .neq("status", "cancelled");
+  for (const r of (rows ?? []) as any[]) {
+    if (r.source_external_id || r.gcal_event_id || !r.start_time) continue;
     const googleId = await writeToGoogleCalendar(
       r.title,
       r.start_time,
@@ -249,22 +170,18 @@ async function syncGoogleCalendar(
       r.description ?? undefined
     );
     if (googleId) {
-      await db
-        .from("events")
-        .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
-        .eq("id", r.id);
-      touched++;
+      await db.from("events").update({ gcal_event_id: googleId }).eq("id", r.id);
+      pushed++;
     }
   }
-
-  return touched;
+  return pushed;
 }
 
 async function syncClassroom(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
-  const calendarEvents = await syncGoogleCalendar(db, platform.id);
+  const calendarEvents = await pushLocalEventsToGoogle(db);
 
   if (platform.external_id === "google_user") {
     return { announcements: 0, events: calendarEvents };

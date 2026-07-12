@@ -267,65 +267,6 @@ export async function updateGoogleCalendarEvent(
   }
 }
 
-export interface GoogleCalendarEvent {
-  id: string;
-  summary: string;
-  description: string | null;
-  startTime: string | null;
-  endTime: string | null;
-}
-
-export async function listGoogleCalendarEvents(
-  timeMin: string,
-  timeMax: string
-): Promise<GoogleCalendarEvent[]> {
-  try {
-    const accessToken = await getValidClassroomToken();
-
-    const params = new URLSearchParams({
-      timeMin,
-      timeMax,
-      singleEvents: "true",
-      showDeleted: "false",
-      orderBy: "startTime",
-      maxResults: "250",
-    });
-
-    const response = await fetch(`${CALENDAR_EVENTS_URL}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) {
-      console.error("Google Calendar list error:", await response.text());
-      return [];
-    }
-
-    const data = (await response.json().catch(() => null)) as {
-      items?: Array<{
-        id: string;
-        status?: string;
-        summary?: string;
-        description?: string;
-        start?: { dateTime?: string; date?: string };
-        end?: { dateTime?: string; date?: string };
-      }>;
-    } | null;
-
-    return (data?.items ?? [])
-      .filter((item) => item.status !== "cancelled" && item.id)
-      .map((item) => ({
-        id: item.id,
-        summary: item.summary || "(no title)",
-        description: item.description ?? null,
-        startTime: item.start?.dateTime ?? item.start?.date ?? null,
-        endTime: item.end?.dateTime ?? item.end?.date ?? null,
-      }));
-  } catch (error) {
-    console.warn("Failed to list Google Calendar events:", error);
-    return [];
-  }
-}
-
 export async function deleteGoogleCalendarEvent(googleId: string): Promise<void> {
   try {
     const accessToken = await getValidClassroomToken();
