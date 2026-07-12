@@ -276,6 +276,11 @@ export class MockSupabaseQueryBuilder {
     return this;
   }
 
+  neq(column: string, value: any) {
+    this.filters.push((item) => item[column] !== value);
+    return this;
+  }
+
   maybeSingle() {
     return this.execute(true);
   }
