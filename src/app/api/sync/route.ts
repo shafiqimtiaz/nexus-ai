@@ -553,7 +553,8 @@ Rules:
                     .from("events")
                     .select(EVENT_COLS_FULL)
                     .eq("start_time", eventStart)
-                    .eq("event_type", eventType);
+                    .eq("event_type", eventType)
+                    .neq("status", "cancelled");
               const existingByContent = (contentCandidates ?? []).find(
                 (c: any) => normalizeEventTitle(c.title) === normalizeEventTitle(eventTitle)
               );

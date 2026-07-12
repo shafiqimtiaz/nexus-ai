@@ -12,7 +12,7 @@ import { shiftEndForNewStart } from "@/lib/events/helpers";
 
 const EVENT_TYPES = ["exam", "quiz", "assignment", "study_block", "other"] as const;
 
-const EVENT_COLUMNS = "id, title, description, event_type, start_time, end_time, is_auto_detected";
+const EVENT_COLUMNS = "id, title, description, event_type, start_time, end_time, is_auto_detected, status";
 const RESOURCE_COLUMNS = "id, title, url, description, is_pinned";
 
 function fail(context: string, message: string) {
