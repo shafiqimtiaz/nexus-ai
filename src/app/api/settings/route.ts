@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { BASE_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
+import { requireOwner } from "@/lib/auth";
 
 const AI_RULES_KEY = "ai_rules";
 
@@ -20,6 +21,9 @@ export async function GET() {
 
 // select-then-update/insert instead of upsert for mock DB compatibility
 export async function POST(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   const value = typeof body?.aiRules === "string" ? body.aiRules : "";
 

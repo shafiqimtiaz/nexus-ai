@@ -9,7 +9,11 @@ Rules:
   announcements. Never invent due dates, exams, or announcement contents — if
   you don't have the data, call the relevant tool to fetch it.
 - To answer "what's due" or "upcoming exams", call get_upcoming_events.
-  - To summarize announcements, call summarize_announcements first. Each
+   - To cancel an event (a cancelled quiz/class, or on request), call cancel_event
+     with the event id. Cancelled events are kept but hidden from upcoming lists.
+   - Announcements carry an announced_at date. When reasoning about dates from an
+     announcement, resolve relative wording against that posting date.
+   - To summarize announcements, call summarize_announcements first. Each
     announcement carries an AI-generated 'summary' field (plus the raw
     'content'); prefer the 'summary' when present and weave in the author,
     platform, and source link so the student can read the gist and jump to the

@@ -168,6 +168,13 @@ export function parseGcalId(externalId: string | null | undefined): string | nul
     : null;
 }
 
+export function eventGcalId(row: {
+  gcal_event_id?: string | null;
+  source_external_id?: string | null;
+}): string | null {
+  return row.gcal_event_id ?? parseGcalId(row.source_external_id);
+}
+
 export async function getGooglePlatformId(): Promise<string | null> {
   const db = createServerClient();
   const { data } = await db
@@ -236,8 +243,7 @@ export async function updateGoogleCalendarEvent(
     if (fields.startTime !== undefined) {
       const { start, end } = eventTimes(fields.startTime, fields.endTime);
       body.start = start;
-      // Only overwrite end when a start was given; otherwise leave Google's end.
-      if (fields.endTime !== undefined) body.end = end;
+      body.end = end; // always send a consistent end with a new start (Google 400s otherwise)
     } else if (fields.endTime !== undefined) {
       body.end = { dateTime: fields.endTime };
     }
@@ -278,61 +284,3 @@ export async function deleteGoogleCalendarEvent(googleId: string): Promise<void>
   }
 }
 
-export interface GoogleCalendarEvent {
-  id: string;
-  summary: string;
-  description: string | null;
-  startTime: string | null;
-  endTime: string | null;
-}
-
-export async function listGoogleCalendarEvents(
-  timeMin: string,
-  timeMax: string
-): Promise<GoogleCalendarEvent[]> {
-  try {
-    const accessToken = await getValidClassroomToken();
-
-    const params = new URLSearchParams({
-      timeMin,
-      timeMax,
-      singleEvents: "true",
-      showDeleted: "false",
-      orderBy: "startTime",
-      maxResults: "250",
-    });
-
-    const response = await fetch(`${CALENDAR_EVENTS_URL}?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!response.ok) {
-      console.error("Google Calendar list error:", await response.text());
-      return [];
-    }
-
-    const data = (await response.json().catch(() => null)) as {
-      items?: Array<{
-        id: string;
-        status?: string;
-        summary?: string;
-        description?: string;
-        start?: { dateTime?: string; date?: string };
-        end?: { dateTime?: string; date?: string };
-      }>;
-    } | null;
-
-    return (data?.items ?? [])
-      .filter((item) => item.status !== "cancelled" && item.id)
-      .map((item) => ({
-        id: item.id,
-        summary: item.summary || "(no title)",
-        description: item.description ?? null,
-        startTime: item.start?.dateTime ?? item.start?.date ?? null,
-        endTime: item.end?.dateTime ?? item.end?.date ?? null,
-      }));
-  } catch (error) {
-    console.warn("Failed to list Google Calendar events:", error);
-    return [];
-  }
-}

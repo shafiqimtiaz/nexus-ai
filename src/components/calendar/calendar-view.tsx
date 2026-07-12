@@ -6,7 +6,6 @@ import {
   addMonths,
   eachDayOfInterval,
   format,
-  isSameDay,
   isSameMonth,
   isToday,
   startOfMonth,
@@ -36,6 +35,7 @@ export type CalendarEvent = {
   source_external_id: string | null;
   is_auto_detected: boolean;
   created_at: string;
+  status?: "confirmed" | "cancelled";
 };
 
 const PILL_CLASS: Record<EventType, string> = {
@@ -105,10 +105,12 @@ export function CalendarView({ role }: { role: Role }) {
     return map;
   }, [events]);
 
+  const [cutoff] = useState(() => Date.now());
   const upcoming = useMemo(() => {
-    const now = Date.now();
-    return allEvents.filter((ev) => new Date(ev.start_time).getTime() >= now).slice(0, 10);
-  }, [allEvents]);
+    return allEvents
+      .filter((ev) => ev.status !== "cancelled" && new Date(ev.start_time).getTime() >= cutoff)
+      .slice(0, 10);
+  }, [allEvents, cutoff]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -216,6 +218,7 @@ export function CalendarView({ role }: { role: Role }) {
                             className={cn(
                               "block w-full truncate rounded px-1.5 py-0.5 text-left text-xs",
                               PILL_CLASS[ev.event_type] ?? PILL_CLASS.other,
+                              ev.status === "cancelled" && "line-through opacity-50",
                               canEdit && "cursor-pointer"
                             )}
                           >

@@ -2,21 +2,27 @@ import "server-only";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
 import { createServerClient } from "@/lib/supabase/server";
+import { getRole } from "@/lib/auth";
 import {
   writeToGoogleCalendar,
   updateGoogleCalendarEvent,
-  getGooglePlatformId,
-  gcalExternalId,
-  parseGcalId,
+  deleteGoogleCalendarEvent,
+  eventGcalId,
 } from "@/lib/auth/google-oauth";
+import { shiftEndForNewStart } from "@/lib/events/helpers";
 
 const EVENT_TYPES = ["exam", "quiz", "assignment", "study_block", "other"] as const;
 
-const EVENT_COLUMNS = "id, title, description, event_type, start_time, end_time, is_auto_detected";
+const EVENT_COLUMNS = "id, title, description, event_type, start_time, end_time, is_auto_detected, status";
 const RESOURCE_COLUMNS = "id, title, url, description, is_pinned";
 
 function fail(context: string, message: string) {
   return { error: `${context}: ${message}` };
+}
+
+// Mutating tools are owner-only: demo sessions (no auth) get a read-only refusal.
+async function denyIfDemo(context: string): Promise<{ error: string } | null> {
+  return (await getRole()) === "owner" ? null : fail(context, "demo mode is read-only");
 }
 
 async function getPlatformTypeMap(
@@ -41,11 +47,7 @@ async function pushEventToGoogle(
     description ?? undefined
   );
   if (googleId) {
-    const platformId = await getGooglePlatformId();
-    await db
-      .from("events")
-      .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
-      .eq("id", eventId);
+    await db.from("events").update({ gcal_event_id: googleId }).eq("id", eventId);
   }
 }
 
@@ -73,6 +75,7 @@ export function getLocalTools(): Record<string, Tool> {
           .select(`${EVENT_COLUMNS}, source_platform`)
           .gte("start_time", now.toISOString())
           .lte("start_time", until.toISOString())
+          .neq("status", "cancelled")
           .order("start_time", { ascending: true });
 
         if (error) return fail("get_upcoming_events", error.message);
@@ -101,6 +104,8 @@ export function getLocalTools(): Record<string, Tool> {
         description: z.string().optional(),
       }),
       execute: async ({ title, event_type, start_time, end_time, description }) => {
+        const denied = await denyIfDemo("create_event");
+        if (denied) return denied;
         const db = createServerClient();
         const { data, error } = await db
           .from("events")
@@ -135,11 +140,20 @@ export function getLocalTools(): Record<string, Tool> {
         description: z.string().optional(),
       }),
       execute: async ({ id, ...fields }) => {
+        const denied = await denyIfDemo("edit_event");
+        if (denied) return denied;
         const db = createServerClient();
         const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
         if (Object.keys(patch).length === 0) {
           return fail("edit_event", "no fields provided to update");
         }
+
+        const { data: before } = await db
+          .from("events")
+          .select("id, start_time, end_time, gcal_event_id, source_external_id")
+          .eq("id", id)
+          .maybeSingle();
+        if (!before) return fail("edit_event", "event not found");
 
         const { data, error } = await db
           .from("events")
@@ -150,31 +164,54 @@ export function getLocalTools(): Record<string, Tool> {
 
         if (error) return fail("edit_event", error.message);
 
-        const { data: mapRow } = await db
-          .from("events")
-          .select("source_external_id")
-          .eq("id", id)
-          .maybeSingle();
-        const gid = parseGcalId(mapRow?.source_external_id);
+        const gid = eventGcalId(before);
         if (gid) {
+          const newStart = patch.start_time as string | undefined;
           await updateGoogleCalendarEvent(gid, {
             title: patch.title as string | undefined,
-            startTime: patch.start_time as string | undefined,
-            endTime: patch.end_time as string | undefined,
+            startTime: newStart,
+            endTime:
+              (patch.end_time as string | undefined) ??
+              (newStart ? shiftEndForNewStart(before.start_time, before.end_time, newStart) : undefined),
             description: patch.description as string | undefined,
           });
         } else {
-          await pushEventToGoogle(
-            db,
-            id,
-            data.title,
-            data.start_time,
-            data.end_time,
-            data.description
-          );
+          await pushEventToGoogle(db, id, data.title, data.start_time, data.end_time, data.description);
         }
 
         return { updated: data };
+      },
+    }),
+
+    cancel_event: tool({
+      description:
+        "Cancel an event by id — use when the student says a quiz/exam/class was cancelled or asks to remove an event. The event is kept as status 'cancelled' (reversible) and its Google Calendar copy is deleted. Get the id from get_upcoming_events first.",
+      inputSchema: z.object({
+        id: z.string().describe("The event id to cancel."),
+      }),
+      execute: async ({ id }) => {
+        const denied = await denyIfDemo("cancel_event");
+        if (denied) return denied;
+        const db = createServerClient();
+        const { data: row } = await db
+          .from("events")
+          .select("id, title, gcal_event_id, source_external_id")
+          .eq("id", id)
+          .maybeSingle();
+        if (!row) return fail("cancel_event", "event not found");
+
+        const { data, error } = await db
+          .from("events")
+          .update({ status: "cancelled" })
+          .eq("id", id)
+          .select(EVENT_COLUMNS)
+          .single();
+        if (error) return fail("cancel_event", error.message);
+
+        const gid = eventGcalId(row);
+        if (gid) await deleteGoogleCalendarEvent(gid);
+
+        return { cancelled: data };
       },
     }),
 
@@ -208,6 +245,8 @@ export function getLocalTools(): Record<string, Tool> {
         description: z.string().optional(),
       }),
       execute: async ({ title, url, description }) => {
+        const denied = await denyIfDemo("add_resource");
+        if (denied) return denied;
         const db = createServerClient();
         const { data, error } = await db
           .from("resources")
@@ -230,6 +269,8 @@ export function getLocalTools(): Record<string, Tool> {
         description: z.string().optional(),
       }),
       execute: async ({ id, ...fields }) => {
+        const denied = await denyIfDemo("edit_resource");
+        if (denied) return denied;
         const db = createServerClient();
         const patch = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
         if (Object.keys(patch).length === 0) {
@@ -262,6 +303,8 @@ export function getLocalTools(): Record<string, Tool> {
           .describe("Number of study sessions to create. Defaults to 3."),
       }),
       execute: async ({ exam_title, exam_date, sessions }) => {
+        const denied = await denyIfDemo("generate_study_plan");
+        if (denied) return denied;
         const db = createServerClient();
         const count = sessions ?? 3;
         const now = Date.now();
@@ -313,6 +356,8 @@ export function getLocalTools(): Record<string, Tool> {
         remind_at: z.string().describe("When to remind, as ISO 8601."),
       }),
       execute: async ({ title, remind_at }) => {
+        const denied = await denyIfDemo("set_reminder");
+        if (denied) return denied;
         const db = createServerClient();
         const { data, error } = await db
           .from("events")
@@ -352,16 +397,26 @@ export function getLocalTools(): Record<string, Tool> {
       }),
       execute: async ({ limit, platform }) => {
         const db = createServerClient();
-        const { data, error } = await db
+        const platformById = await getPlatformTypeMap(db);
+
+        let query = db
           .from("announcements")
           .select("id, title, content, ai_summary, author, source_url, announced_at, platform_id")
           .order("announced_at", { ascending: false, nullsFirst: false })
           .limit(limit ?? 10);
 
+        if (platform) {
+          const ids = [...platformById.entries()]
+            .filter(([, type]) => type === platform)
+            .map(([id]) => id);
+          if (ids.length === 0) return { count: 0, announcements: [] };
+          query = query.in("platform_id", ids);
+        }
+
+        const { data, error } = await query;
         if (error) return fail("summarize_announcements", error.message);
 
-        const platformById = await getPlatformTypeMap(db);
-        let announcements = (data ?? []).map((a: any) => {
+        const announcements = (data ?? []).map((a: any) => {
           const { platform_id, ...rest } = a;
           return {
             ...rest,
@@ -369,10 +424,6 @@ export function getLocalTools(): Record<string, Tool> {
             platform: platform_id ? (platformById.get(platform_id) ?? null) : null,
           };
         });
-
-        if (platform) {
-          announcements = announcements.filter((a: any) => a.platform === platform);
-        }
 
         return { count: announcements.length, announcements };
       },

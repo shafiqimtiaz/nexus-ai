@@ -13,6 +13,8 @@ export type DashboardEvent = {
   end_time: string | null;
   source_platform: string | null;
   platform?: string | null;
+  is_auto_detected?: boolean;
+  source_url?: string | null;
 };
 
 export type DashboardAnnouncement = {
@@ -86,32 +88,40 @@ export async function getDashboardData(): Promise<DashboardData> {
   ] = await Promise.all([
     db
       .from("events")
-      .select("id, title, event_type, start_time, end_time")
+      .select(
+        "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, is_auto_detected"
+      )
       .gte("start_time", nowIso)
       .lte("start_time", in7Days)
+      .neq("status", "cancelled")
       .in("event_type", ["exam", "quiz"])
       .order("start_time", { ascending: true })
       .limit(10),
     db
       .from("events")
-      .select("id, title, event_type, start_time, end_time")
+      .select("id, title, description, event_type, start_time, end_time, source_platform")
       .gte("start_time", startToday)
       .lt("start_time", startTomorrow)
+      .neq("status", "cancelled")
       .order("start_time", { ascending: true }),
     db
       .from("events")
-      .select("id, title, event_type, start_time, end_time")
+      .select(
+        "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, is_auto_detected"
+      )
       .eq("event_type", "exam")
       .gte("start_time", nowIso)
+      .neq("status", "cancelled")
       .order("start_time", { ascending: true })
       .limit(1)
       .maybeSingle(),
     db.from("announcements").select("id", { count: "exact", head: true }).eq("is_read", false),
-    db.from("events").select("id", { count: "exact", head: true }).eq("event_type", "assignment"),
+    db.from("events").select("id", { count: "exact", head: true }).eq("event_type", "assignment").neq("status", "cancelled"),
     db
       .from("events")
       .select("id, title, description, event_type, start_time, end_time, source_platform")
       .eq("event_type", "assignment")
+      .neq("status", "cancelled")
       .order("start_time", { ascending: true })
       .limit(20),
     db
@@ -137,12 +147,45 @@ export async function getDashboardData(): Promise<DashboardData> {
     ? Math.max(0, differenceInCalendarDays(new Date(nextExamRes.data.start_time), now))
     : null;
 
-  const upcoming = (upcomingRes.data ?? []) as DashboardEvent[];
-  const nextExam = (nextExamRes.data ?? null) as DashboardEvent | null;
-  if (nextExam && !upcoming.some((e) => e.id === nextExam.id)) {
-    upcoming.push(nextExam);
-    upcoming.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  const AUTO_ID_RE =
+    /^auto-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+  const annIdOf = (sid: unknown): string | null => {
+    const m = typeof sid === "string" ? sid.match(AUTO_ID_RE) : null;
+    return m ? m[1] : null;
+  };
+
+  const rawUpcoming = [...(upcomingRes.data ?? [])];
+  const nextExamRow = nextExamRes.data ?? null;
+  if (nextExamRow && !rawUpcoming.some((e) => e.id === nextExamRow.id)) {
+    rawUpcoming.push(nextExamRow);
+    rawUpcoming.sort(
+      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+    );
   }
+
+  const annIds = rawUpcoming
+    .map((e) => annIdOf(e.source_external_id))
+    .filter((x): x is string => x !== null);
+  const annUrlById = new Map<string, string | null>();
+  if (annIds.length > 0) {
+    const { data: annRows } = await db
+      .from("announcements")
+      .select("id, source_url")
+      .in("id", annIds);
+    for (const a of annRows ?? []) annUrlById.set(a.id, a.source_url ?? null);
+  }
+
+  const upcoming: DashboardEvent[] = rawUpcoming.map((e) => {
+    const { source_external_id, ...rest } = e;
+    const annId = annIdOf(source_external_id);
+    return {
+      ...rest,
+      platform: e.source_platform
+        ? (platformById.get(e.source_platform)?.type ?? null)
+        : null,
+      source_url: annId ? (annUrlById.get(annId) ?? null) : null,
+    };
+  });
 
   return {
     upcomingEvents: upcoming,

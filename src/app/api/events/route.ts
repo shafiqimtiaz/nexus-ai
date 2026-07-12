@@ -1,17 +1,17 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import type { EventType } from "@/lib/dashboard";
+import { requireOwner } from "@/lib/auth";
+import { shiftEndForNewStart } from "@/lib/events/helpers";
 import {
   writeToGoogleCalendar,
   updateGoogleCalendarEvent,
   deleteGoogleCalendarEvent,
-  getGooglePlatformId,
-  gcalExternalId,
-  parseGcalId,
+  eventGcalId,
 } from "@/lib/auth/google-oauth";
 
 const SELECT_COLUMNS =
-  "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, is_auto_detected, created_at";
+  "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, gcal_event_id, is_auto_detected, status, created_at";
 
 const EVENT_TYPES: readonly EventType[] = ["exam", "quiz", "assignment", "study_block", "other"];
 
@@ -43,6 +43,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   if (
     !body ||
@@ -85,20 +88,17 @@ export async function POST(request: NextRequest) {
     body.description
   );
   if (googleId) {
-    const platformId = await getGooglePlatformId();
-    const externalId = gcalExternalId(googleId);
-    await db
-      .from("events")
-      .update({ source_platform: platformId, source_external_id: externalId })
-      .eq("id", data.id);
-    data.source_platform = platformId;
-    data.source_external_id = externalId;
+    await db.from("events").update({ gcal_event_id: googleId }).eq("id", data.id);
+    data.gcal_event_id = googleId;
   }
 
   return Response.json({ event: data });
 }
 
 export async function PATCH(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body.id !== "string") {
     return Response.json({ error: "An event id is required." }, { status: 400 });
@@ -129,6 +129,15 @@ export async function PATCH(request: NextRequest) {
   }
 
   const db = createServerClient();
+  const { data: before } = await db
+    .from("events")
+    .select("start_time, end_time, gcal_event_id, source_external_id")
+    .eq("id", body.id)
+    .maybeSingle();
+  if (!before) {
+    return Response.json({ error: "Event not found." }, { status: 404 });
+  }
+
   const { data, error } = await db
     .from("events")
     .update(updates)
@@ -140,13 +149,18 @@ export async function PATCH(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  const gid = parseGcalId(data.source_external_id);
+  const gid = eventGcalId(before);
   if (gid) {
+    const newStart = "start_time" in updates ? (updates.start_time as string) : undefined;
     await updateGoogleCalendarEvent(gid, {
       title: "title" in updates ? (updates.title as string) : undefined,
-      startTime: "start_time" in updates ? (updates.start_time as string) : undefined,
+      startTime: newStart,
       endTime:
-        "end_time" in updates ? ((updates.end_time as string | null) ?? undefined) : undefined,
+        "end_time" in updates
+          ? ((updates.end_time as string | null) ?? undefined)
+          : newStart
+            ? shiftEndForNewStart(before.start_time, before.end_time, newStart)
+            : undefined,
       description:
         "description" in updates
           ? ((updates.description as string | null) ?? undefined)
@@ -160,11 +174,7 @@ export async function PATCH(request: NextRequest) {
       data.description ?? undefined
     );
     if (googleId) {
-      const platformId = await getGooglePlatformId();
-      await db
-        .from("events")
-        .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
-        .eq("id", data.id);
+      await db.from("events").update({ gcal_event_id: googleId }).eq("id", data.id);
     }
   }
 
@@ -172,6 +182,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   const id = body?.id ?? request.nextUrl.searchParams.get("id");
   if (typeof id !== "string" || !id) {
@@ -182,7 +195,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: row } = await db
     .from("events")
-    .select("source_external_id")
+    .select("source_external_id, gcal_event_id")
     .eq("id", id)
     .maybeSingle();
 
@@ -191,7 +204,7 @@ export async function DELETE(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  const gid = parseGcalId(row?.source_external_id);
+  const gid = row ? eventGcalId(row) : null;
   if (gid) {
     await deleteGoogleCalendarEvent(gid);
   }

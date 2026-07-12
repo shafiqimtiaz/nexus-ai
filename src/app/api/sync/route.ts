@@ -7,12 +7,15 @@ import { isJoinLeaveMessage } from "@/lib/utils";
 import { listAnnouncements, listAssignments } from "../../../../mcp/classroom/tools";
 import { createGoogle } from "@ai-sdk/google";
 import { generateText } from "ai";
+import { writeToGoogleCalendar, updateGoogleCalendarEvent, deleteGoogleCalendarEvent, eventGcalId } from "@/lib/auth/google-oauth";
 import {
-  writeToGoogleCalendar,
-  listGoogleCalendarEvents,
-  gcalExternalId,
-  parseGcalId,
-} from "@/lib/auth/google-oauth";
+  STALE_ANNOUNCEMENT_DAYS,
+  isStaleAnnouncement,
+  keepExtractedEvent,
+  normalizeEventTitle,
+  isValidDate,
+  shiftEndForNewStart,
+} from "@/lib/events/helpers";
 
 const STALE_MS = 15 * 60 * 1000;
 
@@ -75,15 +78,6 @@ function sanitizeSummary(raw: unknown): string | null {
   return cleaned ? cleaned.slice(0, 500) : null;
 }
 
-function normalizeEventTitle(title: string | null): string {
-  if (!title) return "";
-  return title
-    .replace(/[:–—].*$/, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function classifyEventType(title: string | null): "exam" | "quiz" | "assignment" | "other" {
   const t = (title ?? "").toLowerCase();
   if (/\b(exam|midterm|final)\b/.test(t)) return "exam";
@@ -94,13 +88,6 @@ function classifyEventType(title: string | null): "exam" | "quiz" | "assignment"
 
 function sanitizeContent(raw: string): string {
   return raw.replace(/<@[!&]?\d+>/g, "").trim();
-}
-
-function isFutureDate(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  const t = new Date(value).getTime();
-  if (Number.isNaN(t)) return false;
-  return t > Date.now();
 }
 
 async function upsertAnnouncements(
@@ -157,91 +144,17 @@ async function upsertAnnouncements(
   return rows.length;
 }
 
-const IMPORT_WINDOW_PAST_MS = 30 * 24 * 60 * 60 * 1000;
-const IMPORT_WINDOW_FUTURE_MS = 90 * 24 * 60 * 60 * 1000;
-
-async function syncGoogleCalendar(
-  db: ReturnType<typeof createServerClient>,
-  platformId: string
-): Promise<number> {
-  const now = Date.now();
-  const timeMin = new Date(now - IMPORT_WINDOW_PAST_MS).toISOString();
-  const timeMax = new Date(now + IMPORT_WINDOW_FUTURE_MS).toISOString();
-  const timeMinMs = now - IMPORT_WINDOW_PAST_MS;
-  const timeMaxMs = now + IMPORT_WINDOW_FUTURE_MS;
-
-  const googleEvents = await listGoogleCalendarEvents(timeMin, timeMax);
-  const googleIds = new Set(googleEvents.map((e) => e.id));
-  let touched = 0;
-
-  const { data: platformRows } = await db
+// Export-only mirror: push user-created events (no platform identity, no gcal
+// mapping yet) to Google Calendar. Nexus is the source of truth; nothing is
+// imported back and nothing local is ever deleted because of Google.
+async function pushLocalEventsToGoogle(db: ReturnType<typeof createServerClient>): Promise<number> {
+  let pushed = 0;
+  const { data: rows } = await db
     .from("events")
-    .select("id, source_external_id, event_type, start_time")
-    .eq("source_platform", platformId);
-  const localGcal = (platformRows ?? []).filter((r: any) => parseGcalId(r.source_external_id));
-  const localByGid = new Map<string, any>(
-    localGcal.map((r: any) => [parseGcalId(r.source_external_id) as string, r])
-  );
-
-  const { data: contentRows } = await db.from("events").select("title, event_type, start_time");
-  const contentKey = (
-    title: string | null,
-    eventType: string | null,
-    start: string | null
-  ): string => {
-    const ms = start ? new Date(start).getTime() : NaN;
-    return `${ms} ${eventType ?? ""} ${normalizeEventTitle(title)}`;
-  };
-  const seenContent = new Set<string>(
-    (contentRows ?? []).map((r: any) => contentKey(r.title, r.event_type, r.start_time))
-  );
-
-  for (const ev of googleEvents) {
-    if (!ev.startTime) continue;
-    const existing = localByGid.get(ev.id);
-    if (existing) {
-      await db
-        .from("events")
-        .update({
-          title: ev.summary,
-          description: ev.description,
-          start_time: ev.startTime,
-          end_time: ev.endTime,
-        })
-        .eq("id", existing.id);
-    } else {
-      const key = contentKey(ev.summary, classifyEventType(ev.summary), ev.startTime);
-      if (seenContent.has(key)) continue;
-      await db.from("events").insert({
-        title: ev.summary,
-        description: ev.description,
-        event_type: classifyEventType(ev.summary),
-        start_time: ev.startTime,
-        end_time: ev.endTime,
-        source_platform: platformId,
-        source_external_id: gcalExternalId(ev.id),
-        is_auto_detected: true,
-      });
-      seenContent.add(key);
-    }
-    touched++;
-  }
-
-  for (const r of localGcal) {
-    const startMs = r.start_time ? new Date(r.start_time).getTime() : NaN;
-    if (Number.isNaN(startMs) || startMs < timeMinMs || startMs > timeMaxMs) continue;
-    const gid = parseGcalId(r.source_external_id) as string;
-    if (!googleIds.has(gid)) {
-      await db.from("events").delete().eq("id", r.id);
-      touched++;
-    }
-  }
-
-  const { data: allEvents } = await db
-    .from("events")
-    .select("id, title, start_time, end_time, description, source_external_id");
-  for (const r of (allEvents ?? []) as any[]) {
-    if (r.source_external_id || !r.start_time) continue;
+    .select("id, title, start_time, end_time, description, source_external_id, gcal_event_id")
+    .neq("status", "cancelled");
+  for (const r of (rows ?? []) as any[]) {
+    if (r.source_external_id || r.gcal_event_id || !r.start_time) continue;
     const googleId = await writeToGoogleCalendar(
       r.title,
       r.start_time,
@@ -249,22 +162,18 @@ async function syncGoogleCalendar(
       r.description ?? undefined
     );
     if (googleId) {
-      await db
-        .from("events")
-        .update({ source_platform: platformId, source_external_id: gcalExternalId(googleId) })
-        .eq("id", r.id);
-      touched++;
+      await db.from("events").update({ gcal_event_id: googleId }).eq("id", r.id);
+      pushed++;
     }
   }
-
-  return touched;
+  return pushed;
 }
 
 async function syncClassroom(
   db: ReturnType<typeof createServerClient>,
   platform: PlatformRow
 ): Promise<{ announcements: number; events: number }> {
-  const calendarEvents = await syncGoogleCalendar(db, platform.id);
+  const calendarEvents = await pushLocalEventsToGoogle(db);
 
   if (platform.external_id === "google_user") {
     return { announcements: 0, events: calendarEvents };
@@ -392,6 +301,7 @@ export async function POST(request: NextRequest) {
 
   const platforms = (data ?? []) as PlatformRow[];
   const synced: SyncResult[] = [];
+  let aiErrors = 0;
   const staleCutoff = Date.now() - STALE_MS;
 
   for (const platform of platforms) {
@@ -464,7 +374,7 @@ export async function POST(request: NextRequest) {
         .limit(12);
 
       if (anns && anns.length > 0) {
-        for (const ann of anns) {
+          for (const ann of anns) {
           const { data: existingAction } = await db
             .from("agent_actions")
             .select("id")
@@ -474,7 +384,23 @@ export async function POST(request: NextRequest) {
 
           if (existingAction) continue;
 
+          if (isStaleAnnouncement(ann.announced_at, new Date())) {
+            try {
+              await db.from("agent_actions").insert({
+                title: "Skipped stale announcement",
+                description: `Announcement posted ${ann.announced_at} is older than ${STALE_ANNOUNCEMENT_DAYS} days — no events scheduled from it.`,
+                action_type: "sync",
+                source_id: ann.id,
+              });
+            } catch {}
+            continue;
+          }
+
+          const nowIso = new Date().toISOString();
           const prompt = `You are the autonomous Nexus AI Concierge Agent. Read this university announcement in FULL and extract EVERYTHING useful for a student's academic organizer.
+
+Announcement posted at: ${ann.announced_at ?? "unknown"}
+Current date: ${nowIso}
 
 Announcement content:
 "${ann.content}"
@@ -483,8 +409,17 @@ Extract ALL of the following — be exhaustive, never stop after the first match
 - summary: A short, easy-to-read summary (2–4 sentences, plain language, no markdown) of the announcement's key points so a student can skim it at a glance. Lead with what matters most. Preserve concrete details (rooms, times, dates, names).
 - title: A concise, human-readable headline for the whole announcement (max ~8 words), plain text only — no markdown, quotes, or emoji.
 - events: EVERY deadline or scheduled occurrence — every quiz, exam, midterm, final, assignment/homework/project submission, office hour, review session, or meeting. Assignment submission deadlines MUST use event_type "assignment"; quizzes "quiz"; exams/midterms/finals "exam"; other scheduled items "other". If a date/time range is given, set end_time too.
+  Each event carries an "action":
+  - "create": a newly announced deadline or occurrence.
+  - "update": the announcement MOVES or CHANGES an already-known event (words like "moved to", "postponed", "rescheduled", "new date", "changed to"). Use the event's original name as title and the NEW date/time as start_time.
+  - "cancel": the announcement CANCELS an event ("cancelled", "called off", "will not take place", "no quiz this week"). Use the cancelled event's name as title; start_time may be an empty string.
 - resources: EVERY distinct URL (Google Docs, Drive, Forms, PDFs, slides, syllabus, repo, video, website) as a resource. Use the link's visible label as the title when present; otherwise infer a short title from context. Add a one-line description of what the link is.
 - key_dates: An array of {label, date} for ANY standalone important dates mentioned even if they don't become calendar events (e.g. "Reading due", "Drop deadline"). Use ISO 8601 dates. Empty array if none.
+
+Date rules (CRITICAL):
+- Resolve ALL relative dates ("today", "tomorrow", "Wednesday", "next week") against the ANNOUNCEMENT POSTED date above — NOT the current date. An announcement saying "quiz on Wednesday" means the Wednesday right after it was posted.
+- start_time and end_time MUST be full ISO 8601 WITH an explicit UTC offset (e.g. "2026-07-15T23:59:00+06:00" or "2026-07-15T17:59:00Z"). Never emit a naive timestamp.
+- If only a date is given, use 23:59 in the announcement's local timezone; if the timezone is unknown, use the announcement posted time's offset.
 
 Rules:
 - A single announcement often bundles MULTIPLE items (e.g. a quiz AND an assignment, plus several links). Capture EVERY one as its own array entry.
@@ -493,32 +428,29 @@ Rules:
   summary: string;
   title: string;
   events: Array<{
+    action: "create" | "update" | "cancel";
     title: string;
     description: string;
     event_type: "exam" | "quiz" | "assignment" | "other";
-    start_time: string; // ISO 8601. Use the stated due date/time; assume year 2026 if not specified, and 23:59 local time if only a date is given.
-    end_time: string;   // ISO 8601 or empty string when not stated.
+    start_time: string; // ISO 8601 with offset; empty string only for action "cancel"
+    end_time: string;   // ISO 8601 with offset, or empty string when not stated.
   }>;
   resources: Array<{
     title: string;
     url: string;
     description: string;
   }>;
-  key_dates: Array<{ label: string; date: string }>;
+  key_dates: Array<{ label: string; date: string }>
 }
 - Use empty arrays when there are no events, resources, or key_dates.
 - Do not add markdown backticks or any wrapper — return raw JSON string.`;
 
-          const { text } = await generateText({
-            model: googleProvider("gemini-flash-lite-latest"),
-            prompt,
-          });
-
-          const cleanText = text
-            .replace(/```json/g, "")
-            .replace(/```/g, "")
-            .trim();
           try {
+            const { text } = await generateText({
+              model: googleProvider("gemini-flash-lite-latest"),
+              prompt,
+            });
+            const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
             const result = JSON.parse(cleanText);
 
             const aiTitle = sanitizeTitle(result.title);
@@ -543,11 +475,7 @@ Rules:
             const rawKeyDates: any[] = Array.isArray(result.key_dates) ? result.key_dates : [];
 
             const events = rawEvents
-              .filter((e) => {
-                if (!e || typeof e.start_time !== "string") return false;
-                if (e.event_type === "assignment") return true;
-                return isFutureDate(e.start_time);
-              })
+              .filter((e) => e && typeof e.title === "string" && keepExtractedEvent(e, new Date()))
               .map((e) => {
                 const endRaw = typeof e.end_time === "string" ? e.end_time.trim() : "";
                 const endMs = endRaw ? new Date(endRaw).getTime() : NaN;
@@ -556,17 +484,62 @@ Rules:
                 return { ...e, end_time };
               });
 
-            const EVENT_COLS_FULL = "id, source_platform, source_external_id, title";
+            const EVENT_COLS_FULL = "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, gcal_event_id, status";
             const scheduled: string[] = [];
+            const warnings: string[] = [];
 
             for (let i = 0; i < events.length; i++) {
               const ev = events[i];
+              const action = ev.action === "update" || ev.action === "cancel" ? ev.action : "create";
               const eventTitle = ev.title;
               const eventStart = ev.start_time;
               const eventType =
                 ev.event_type && ev.event_type !== "other"
                   ? ev.event_type
                   : classifyEventType(eventTitle);
+
+              if (action === "cancel" || action === "update") {
+                const { data: candidates } = await db
+                  .from("events")
+                  .select("id, title, start_time, end_time, gcal_event_id, source_external_id")
+                  .eq("event_type", eventType)
+                  .neq("status", "cancelled")
+                  .gte("start_time", new Date().toISOString());
+                const target = (candidates ?? []).find(
+                  (c: any) => normalizeEventTitle(c.title) === normalizeEventTitle(eventTitle)
+                );
+                if (!target) {
+                  warnings.push(`could not find a matching ${eventType} for ${action} "${eventTitle}"`);
+                  continue;
+                }
+                const gid = eventGcalId(target);
+                if (action === "cancel") {
+                  await db.from("events").update({ status: "cancelled" }).eq("id", target.id);
+                  if (gid) await deleteGoogleCalendarEvent(gid);
+                  scheduled.push(`cancelled ${eventType} "${target.title}"`);
+                } else {
+                  const patch: Record<string, unknown> = {};
+                  if (ev.description) patch.description = ev.description;
+                  if (isValidDate(eventStart)) patch.start_time = eventStart;
+                  if (ev.end_time) patch.end_time = ev.end_time;
+                  await db.from("events").update(patch).eq("id", target.id);
+                  if (gid && patch.start_time) {
+                    await updateGoogleCalendarEvent(gid, {
+                      startTime: eventStart,
+                      endTime:
+                        ev.end_time ?? shiftEndForNewStart(target.start_time, target.end_time, eventStart),
+                      description: ev.description || undefined,
+                    });
+                  }
+                  scheduled.push(
+                    `rescheduled ${eventType} "${target.title}" to ${new Date(
+                      (patch.start_time as string) ?? target.start_time
+                    ).toLocaleDateString()}`
+                  );
+                }
+                continue;
+              }
+
               const autoExternalId = `auto-${ann.id}-${i}`;
 
               const { data: existingByAuto } = await db
@@ -582,14 +555,14 @@ Rules:
                     .from("events")
                     .select(EVENT_COLS_FULL)
                     .eq("start_time", eventStart)
-                    .eq("event_type", eventType);
+                    .eq("event_type", eventType)
+                    .neq("status", "cancelled");
               const existingByContent = (contentCandidates ?? []).find(
                 (c: any) => normalizeEventTitle(c.title) === normalizeEventTitle(eventTitle)
               );
 
               const existing = existingByAuto ?? existingByContent;
 
-              let isNew = false;
               if (existing) {
                 await db
                   .from("events")
@@ -615,17 +588,17 @@ Rules:
                   .select("id")
                   .single();
                 if (evError || !inserted) continue;
-                isNew = true;
-              }
 
-              if (isNew) {
                 try {
-                  await writeToGoogleCalendar(
+                  const googleId = await writeToGoogleCalendar(
                     eventTitle,
                     eventStart,
                     ev.end_time ?? undefined,
                     ev.description
                   );
+                  if (googleId) {
+                    await db.from("events").update({ gcal_event_id: googleId }).eq("id", inserted.id);
+                  }
                 } catch {}
                 scheduled.push(
                   `${eventType} "${eventTitle}" on ${new Date(eventStart).toLocaleDateString()}`
@@ -680,15 +653,23 @@ Rules:
               } catch {}
             }
 
-            if (events.length === 0 && rawResources.length === 0 && rawKeyDates.length === 0) {
-              await db.from("agent_actions").insert({
-                title: "Concierge Announcement Scan",
-                description: `Processed announcement "${ann.content.slice(0, 50)}...". No actionable events or study links detected.`,
-                action_type: "sync",
-                source_id: ann.id,
-              });
+            if (scheduled.length === 0 && !savedResource) {
+              try {
+                await db.from("agent_actions").insert({
+                  title: "Concierge Announcement Scan",
+                  description:
+                    warnings.length > 0
+                      ? `Reviewed announcement but ${warnings.join("; ")}.`
+                      : `Processed announcement "${ann.content.slice(0, 50)}...". Nothing new to schedule or save.`,
+                  action_type: "sync",
+                  source_id: ann.id,
+                });
+              } catch {}
             }
-          } catch {}
+          } catch {
+            aiErrors++;
+            continue;
+          }
         }
       }
 
@@ -733,5 +714,5 @@ Announcement:
     }
   } catch {}
 
-  return Response.json({ synced });
+  return Response.json({ synced, aiErrors });
 }

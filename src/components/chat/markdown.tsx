@@ -1,5 +1,17 @@
 import { Fragment, type ReactNode } from "react";
 
+function safeHref(url: string): string | null {
+  const trimmed = url.trim();
+  if (
+    /^https?:\/\//i.test(trimmed) ||
+    /^mailto:/i.test(trimmed) ||
+    (trimmed.startsWith("/") && !trimmed.startsWith("//"))
+  ) {
+    return trimmed;
+  }
+  return null;
+}
+
 function renderInline(text: string, keyPrefix: string): ReactNode[] {
   const nodes: ReactNode[] = [];
   const pattern = /(\*\*(.+?)\*\*|__(.+?)__|\*(.+?)\*|_(.+?)_|`([^`]+?)`|\[([^\]]+)\]\(([^)]+)\))/;
@@ -29,17 +41,22 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
         </code>
       );
     } else if (match[7] !== undefined) {
-      nodes.push(
-        <a
-          key={key}
-          href={match[8]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-medium text-primary underline underline-offset-2"
-        >
-          {match[7]}
-        </a>
-      );
+      const href = safeHref(match[8]);
+      if (href) {
+        nodes.push(
+          <a
+            key={key}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            {match[7]}
+          </a>
+        );
+      } else {
+        nodes.push(<Fragment key={key}>{match[7]}</Fragment>);
+      }
     }
 
     rest = rest.slice(match.index + match[0].length);

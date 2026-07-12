@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireOwner } from "@/lib/auth";
 
 const SELECT = "id, name, color";
 
@@ -13,6 +14,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body.name !== "string" || !body.name.trim()) {
     return Response.json({ error: "A label name is required." }, { status: 400 });
