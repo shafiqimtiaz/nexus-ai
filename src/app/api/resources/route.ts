@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase/server";
+import { requireOwner } from "@/lib/auth";
 
 const SELECT =
   "id, title, url, description, is_pinned, source_platform, created_at, labels:resource_labels(label:labels(id, name, color))";
@@ -80,6 +81,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   if (
     !body ||
@@ -132,6 +136,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body.id !== "string") {
     return Response.json({ error: "A resource id is required." }, { status: 400 });
@@ -186,6 +193,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const denied = await requireOwner();
+  if (denied) return denied;
+
   const body = await request.json().catch(() => null);
   const id = body?.id ?? request.nextUrl.searchParams.get("id");
   if (typeof id !== "string" || !id) {

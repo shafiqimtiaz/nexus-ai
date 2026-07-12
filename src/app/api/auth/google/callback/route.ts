@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
       path: "/",
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      httpOnly: true,
     });
 
     return NextResponse.redirect(optionsUrl("connected=classroom"));
