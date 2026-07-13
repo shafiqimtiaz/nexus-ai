@@ -13,7 +13,8 @@ import { shiftEndForNewStart } from "@/lib/events/helpers";
 
 const EVENT_TYPES = ["exam", "quiz", "assignment", "study_block", "other"] as const;
 
-const EVENT_COLUMNS = "id, title, description, event_type, start_time, end_time, is_auto_detected, status";
+const EVENT_COLUMNS =
+  "id, title, description, event_type, start_time, end_time, is_auto_detected, status";
 const RESOURCE_COLUMNS = "id, title, url, description, is_pinned";
 
 function fail(context: string, message: string) {
@@ -172,11 +173,20 @@ export function getLocalTools(): Record<string, Tool> {
             startTime: newStart,
             endTime:
               (patch.end_time as string | undefined) ??
-              (newStart ? shiftEndForNewStart(before.start_time, before.end_time, newStart) : undefined),
+              (newStart
+                ? shiftEndForNewStart(before.start_time, before.end_time, newStart)
+                : undefined),
             description: patch.description as string | undefined,
           });
         } else {
-          await pushEventToGoogle(db, id, data.title, data.start_time, data.end_time, data.description);
+          await pushEventToGoogle(
+            db,
+            id,
+            data.title,
+            data.start_time,
+            data.end_time,
+            data.description
+          );
         }
 
         return { updated: data };

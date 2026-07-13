@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { CalendarClockIcon } from "@hugeicons/core-free-icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EventBadge } from "@/components/dashboard/event-badge";
+import { PlatformPill } from "@/components/dashboard/platform-pill";
 import type { DashboardEvent } from "@/lib/dashboard";
 
 function ExamRow({ event }: { event: DashboardEvent }) {
@@ -28,18 +29,27 @@ function ExamRow({ event }: { event: DashboardEvent }) {
         </div>
       </div>
 
-      {(event.description || end) && (
-        <div className="mt-2 space-y-1.5 border-t pt-2 text-sm">
-          {event.description && (
-            <p className="text-muted-foreground leading-relaxed">{event.description}</p>
-          )}
-          {end && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground/70">Ends:</span>
-              <span>{format(end, "EEE, MMM d, yyyy 'at' p")}</span>
+      {(event.platform || event.description || end) && (
+        <>
+          {event.platform && (
+            <div className="pt-2">
+              <PlatformPill platform={event.platform} />
             </div>
           )}
-        </div>
+          {(event.description || end) && (
+            <div className="mt-2 space-y-1.5 border-t pt-2 text-sm">
+              {event.description && (
+                <p className="text-muted-foreground leading-relaxed">{event.description}</p>
+              )}
+              {end && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground/70">Ends:</span>
+                  <span>{format(end, "EEE, MMM d, yyyy 'at' p")}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
