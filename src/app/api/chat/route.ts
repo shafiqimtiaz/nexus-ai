@@ -10,7 +10,6 @@ import { createServerClient } from "@/lib/supabase/server";
 const ALLOWED_MODELS = [
   "gemini-flash-lite-latest",
   "gemini-flash-latest",
-  "gemini-pro-latest",
   "gemini-3.1-flash-lite",
   "gemini-3.5-flash",
 ];
@@ -37,7 +36,7 @@ export async function POST(request: NextRequest) {
   const modelName =
     requestedModel && ALLOWED_MODELS.includes(requestedModel)
       ? requestedModel
-      : "gemini-flash-lite-latest";
+      : "gemini-flash-latest";
 
   if (!Array.isArray(messages)) {
     return Response.json({ error: "messages must be an array" }, { status: 400 });

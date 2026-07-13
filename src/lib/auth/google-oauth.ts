@@ -283,4 +283,3 @@ export async function deleteGoogleCalendarEvent(googleId: string): Promise<void>
     console.warn("Failed to delete Google Calendar event:", error);
   }
 }
-

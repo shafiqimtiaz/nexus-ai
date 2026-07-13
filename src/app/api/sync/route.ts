@@ -7,7 +7,12 @@ import { isJoinLeaveMessage } from "@/lib/utils";
 import { listAnnouncements, listAssignments } from "../../../../mcp/classroom/tools";
 import { createGoogle } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { writeToGoogleCalendar, updateGoogleCalendarEvent, deleteGoogleCalendarEvent, eventGcalId } from "@/lib/auth/google-oauth";
+import {
+  writeToGoogleCalendar,
+  updateGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+  eventGcalId,
+} from "@/lib/auth/google-oauth";
 import {
   STALE_ANNOUNCEMENT_DAYS,
   isStaleAnnouncement,
@@ -142,6 +147,39 @@ async function upsertAnnouncements(
     if (error) throw new Error(error.message);
   }
   return rows.length;
+}
+
+async function deduplicateEvents(db: ReturnType<typeof createServerClient>): Promise<number> {
+  const { data: rows } = await db
+    .from("events")
+    .select("id, title, event_type, start_time, description, source_external_id, gcal_event_id")
+    .neq("status", "cancelled");
+
+  const groups = new Map<string, any[]>();
+  for (const r of (rows ?? []) as any[]) {
+    const dateKey = r.start_time ? r.start_time.slice(0, 10) : "";
+    const key = `${normalizeEventTitle(r.title)}|${dateKey}|${r.event_type}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
+
+  let removed = 0;
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+    group.sort((a: any, b: any) => {
+      const aScore =
+        (a.source_external_id ? 2 : 0) + (a.description ? 1 : 0) + (a.gcal_event_id ? 1 : 0);
+      const bScore =
+        (b.source_external_id ? 2 : 0) + (b.description ? 1 : 0) + (b.gcal_event_id ? 1 : 0);
+      return bScore - aScore;
+    });
+    const keep = group[0];
+    for (let i = 1; i < group.length; i++) {
+      await db.from("events").update({ status: "cancelled" }).eq("id", group[i].id);
+      removed++;
+    }
+  }
+  return removed;
 }
 
 // Export-only mirror: push user-created events (no platform identity, no gcal
@@ -374,7 +412,7 @@ export async function POST(request: NextRequest) {
         .limit(12);
 
       if (anns && anns.length > 0) {
-          for (const ann of anns) {
+        for (const ann of anns) {
           const { data: existingAction } = await db
             .from("agent_actions")
             .select("id")
@@ -447,10 +485,13 @@ Rules:
 
           try {
             const { text } = await generateText({
-              model: googleProvider("gemini-flash-lite-latest"),
+              model: googleProvider("gemini-flash-latest"),
               prompt,
             });
-            const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
+            const cleanText = text
+              .replace(/```json/g, "")
+              .replace(/```/g, "")
+              .trim();
             const result = JSON.parse(cleanText);
 
             const aiTitle = sanitizeTitle(result.title);
@@ -484,13 +525,15 @@ Rules:
                 return { ...e, end_time };
               });
 
-            const EVENT_COLS_FULL = "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, gcal_event_id, status";
+            const EVENT_COLS_FULL =
+              "id, title, description, event_type, start_time, end_time, source_platform, source_external_id, gcal_event_id, status";
             const scheduled: string[] = [];
             const warnings: string[] = [];
 
             for (let i = 0; i < events.length; i++) {
               const ev = events[i];
-              const action = ev.action === "update" || ev.action === "cancel" ? ev.action : "create";
+              const action =
+                ev.action === "update" || ev.action === "cancel" ? ev.action : "create";
               const eventTitle = ev.title;
               const eventStart = ev.start_time;
               const eventType =
@@ -509,7 +552,9 @@ Rules:
                   (c: any) => normalizeEventTitle(c.title) === normalizeEventTitle(eventTitle)
                 );
                 if (!target) {
-                  warnings.push(`could not find a matching ${eventType} for ${action} "${eventTitle}"`);
+                  warnings.push(
+                    `could not find a matching ${eventType} for ${action} "${eventTitle}"`
+                  );
                   continue;
                 }
                 const gid = eventGcalId(target);
@@ -527,7 +572,8 @@ Rules:
                     await updateGoogleCalendarEvent(gid, {
                       startTime: eventStart,
                       endTime:
-                        ev.end_time ?? shiftEndForNewStart(target.start_time, target.end_time, eventStart),
+                        ev.end_time ??
+                        shiftEndForNewStart(target.start_time, target.end_time, eventStart),
                       description: ev.description || undefined,
                     });
                   }
@@ -542,6 +588,7 @@ Rules:
 
               const autoExternalId = `auto-${ann.id}-${i}`;
 
+              // Run both queries independently to detect all possible conflicts
               const { data: existingByAuto } = await db
                 .from("events")
                 .select(EVENT_COLS_FULL)
@@ -549,18 +596,19 @@ Rules:
                 .eq("source_external_id", autoExternalId)
                 .maybeSingle();
 
-              const { data: contentCandidates } = existingByAuto
-                ? { data: [] }
-                : await db
-                    .from("events")
-                    .select(EVENT_COLS_FULL)
-                    .eq("start_time", eventStart)
-                    .eq("event_type", eventType)
-                    .neq("status", "cancelled");
+              const { data: contentCandidates } = await db
+                .from("events")
+                .select(EVENT_COLS_FULL)
+                .eq("start_time", eventStart)
+                .eq("event_type", eventType)
+                .neq("status", "cancelled");
+
+              // Find content match
               const existingByContent = (contentCandidates ?? []).find(
                 (c: any) => normalizeEventTitle(c.title) === normalizeEventTitle(eventTitle)
               );
 
+              // Decide which existing event to prevent (prefer auto-generated ID match)
               const existing = existingByAuto ?? existingByContent;
 
               if (existing) {
@@ -597,7 +645,10 @@ Rules:
                     ev.description
                   );
                   if (googleId) {
-                    await db.from("events").update({ gcal_event_id: googleId }).eq("id", inserted.id);
+                    await db
+                      .from("events")
+                      .update({ gcal_event_id: googleId })
+                      .eq("id", inserted.id);
                   }
                 } catch {}
                 scheduled.push(
@@ -714,5 +765,7 @@ Announcement:
     }
   } catch {}
 
-  return Response.json({ synced, aiErrors });
+  const deduped = await deduplicateEvents(db);
+
+  return Response.json({ synced, aiErrors, deduped });
 }

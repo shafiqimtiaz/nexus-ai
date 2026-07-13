@@ -116,7 +116,11 @@ export async function getDashboardData(): Promise<DashboardData> {
       .limit(1)
       .maybeSingle(),
     db.from("announcements").select("id", { count: "exact", head: true }).eq("is_read", false),
-    db.from("events").select("id", { count: "exact", head: true }).eq("event_type", "assignment").neq("status", "cancelled"),
+    db
+      .from("events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "assignment")
+      .neq("status", "cancelled"),
     db
       .from("events")
       .select("id, title, description, event_type, start_time, end_time, source_platform")
@@ -147,8 +151,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     ? Math.max(0, differenceInCalendarDays(new Date(nextExamRes.data.start_time), now))
     : null;
 
-  const AUTO_ID_RE =
-    /^auto-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+  const AUTO_ID_RE = /^auto-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
   const annIdOf = (sid: unknown): string | null => {
     const m = typeof sid === "string" ? sid.match(AUTO_ID_RE) : null;
     return m ? m[1] : null;
@@ -158,9 +161,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const nextExamRow = nextExamRes.data ?? null;
   if (nextExamRow && !rawUpcoming.some((e) => e.id === nextExamRow.id)) {
     rawUpcoming.push(nextExamRow);
-    rawUpcoming.sort(
-      (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-    );
+    rawUpcoming.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }
 
   const annIds = rawUpcoming
@@ -180,9 +181,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     const annId = annIdOf(source_external_id);
     return {
       ...rest,
-      platform: e.source_platform
-        ? (platformById.get(e.source_platform)?.type ?? null)
-        : null,
+      platform: e.source_platform ? (platformById.get(e.source_platform)?.type ?? null) : null,
       source_url: annId ? (annUrlById.get(annId) ?? null) : null,
     };
   });

@@ -5,6 +5,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { CalendarClockIcon } from "@hugeicons/core-free-icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EventBadge } from "@/components/dashboard/event-badge";
+import { PlatformPill } from "@/components/dashboard/platform-pill";
 import type { DashboardEvent } from "@/lib/dashboard";
 
 function ExamRow({ event }: { event: DashboardEvent }) {
@@ -29,7 +30,12 @@ function ExamRow({ event }: { event: DashboardEvent }) {
       </div>
 
       {(event.description || end) && (
-        <div className="mt-2 space-y-1.5 border-t pt-2 text-sm">
+        {event.platform && (
+        <div className="pt-2">
+          <PlatformPill platform={event.platform} />
+        </div>
+      )}
+      <div className="mt-2 space-y-1.5 border-t pt-2 text-sm">
           {event.description && (
             <p className="text-muted-foreground leading-relaxed">{event.description}</p>
           )}
