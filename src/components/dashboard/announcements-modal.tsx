@@ -36,8 +36,8 @@ function AnnouncementRow({ item, highlighted }: { item: DashboardAnnouncement; h
     <div
       data-announcement-id={item.id}
       className={cn(
-        "rounded-lg border transition-colors",
-        highlighted && "ring-2 ring-primary ring-offset-2"
+        "rounded-lg border transition-all duration-300",
+        highlighted && "ring-2 ring-primary"
       )}
     >
       <button
@@ -173,8 +173,18 @@ export function AnnouncementsModal({
   }, []);
 
   useEffect(() => {
-    if (open && cachedPage === -1) {
+    if (open) {
+      cachedPage = -1;
+      cachedItems = [];
+      cachedTotal = 0;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setItems([]);
       fetchNextPage();
+    } else {
+      isFetchingRef.current = false;
+      cachedPage = -1;
+      cachedItems = [];
+      cachedTotal = 0;
     }
   }, [open, fetchNextPage]);
 
