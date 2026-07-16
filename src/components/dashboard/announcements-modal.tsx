@@ -60,7 +60,7 @@ function AnnouncementRow({ item }: { item: DashboardAnnouncement }) {
               )}
             </div>
             {item.ai_summary && (
-              <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.ai_summary}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{item.ai_summary}</p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               {item.author && (
@@ -90,11 +90,6 @@ function AnnouncementRow({ item }: { item: DashboardAnnouncement }) {
 
       {expanded && (
         <div className="border-t px-4 py-3 text-sm">
-          {item.ai_summary && (
-            <p className="mb-2 rounded-md bg-primary/5 px-3 py-2 text-xs leading-relaxed text-foreground">
-              {item.ai_summary}
-            </p>
-          )}
           {item.content && (
             <p className="leading-relaxed text-muted-foreground whitespace-pre-wrap">
               {item.content}
