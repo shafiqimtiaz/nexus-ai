@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils";
 import type { DashboardAnnouncement } from "@/lib/dashboard";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 5; 
+const HIGHLIGHT_DURATION = 2000;
 
 const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
 
@@ -28,11 +29,17 @@ function formatPlatform(type: string): string {
   return PLATFORM_LABELS[type] ?? type;
 }
 
-function AnnouncementRow({ item }: { item: DashboardAnnouncement }) {
+function AnnouncementRow({ item, highlighted }: { item: DashboardAnnouncement; highlighted?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-lg border">
+    <div
+      data-announcement-id={item.id}
+      className={cn(
+        "rounded-lg border transition-colors",
+        highlighted && "ring-2 ring-primary ring-offset-2"
+      )}
+    >
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
@@ -84,21 +91,21 @@ function AnnouncementRow({ item }: { item: DashboardAnnouncement }) {
 
       {expanded && (
         <div className="border-t px-4 py-3 text-sm">
-          {item.content && (
-            <p className="leading-relaxed text-muted-foreground whitespace-pre-wrap">
-              {item.content}
-            </p>
-          )}
           {item.source_url && (
             <a
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              className="mb-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
             >
               <HugeiconsIcon icon={ExternalLinkIcon} className="h-3 w-3" />
               Open in source
             </a>
+          )}
+          {item.content && (
+            <p className="leading-relaxed text-muted-foreground whitespace-pre-wrap">
+              {item.content}
+            </p>
           )}
         </div>
       )}
@@ -118,17 +125,21 @@ let cachedItems: DashboardAnnouncement[] = [];
 export function AnnouncementsModal({
   open,
   onOpenChange,
+  initialScrollToId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialScrollToId?: string | null;
 }) {
   const [items, setItems] = useState<DashboardAnnouncement[]>(cachedItems);
   const [total, setTotal] = useState(cachedTotal);
   const [loading, setLoading] = useState(false);
   const [fetchingMore, setFetchingMore] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const hasMore = items.length < total;
 
@@ -185,6 +196,20 @@ export function AnnouncementsModal({
     return () => observer.disconnect();
   }, [open, hasMore, fetchNextPage]);
 
+  useEffect(() => {
+    if (!open || !initialScrollToId || items.length === 0) return;
+    const el = scrollContainerRef.current?.querySelector(`[data-announcement-id="${initialScrollToId}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setHighlightedId(initialScrollToId);
+    clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION);
+  }, [open, initialScrollToId, items]);
+
+  useEffect(() => {
+    return () => clearTimeout(highlightTimerRef.current);
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-5xl !duration-0 data-open:animate-none data-closed:animate-none">
@@ -207,7 +232,7 @@ export function AnnouncementsModal({
             className="max-h-[70vh] space-y-2 overflow-y-auto scrollbar-none pr-1"
           >
             {items.map((item) => (
-              <AnnouncementRow key={item.id} item={item} />
+              <AnnouncementRow key={item.id} item={item} highlighted={item.id === highlightedId} />
             ))}
             {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
             {fetchingMore && (

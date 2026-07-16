@@ -9,7 +9,6 @@ import {
 } from "@hugeicons/core-free-icons";
 import { Card, CardContent } from "@/components/ui/card";
 import { AssignmentsModal } from "@/components/dashboard/assignments-modal";
-import { AnnouncementsModal } from "@/components/dashboard/announcements-modal";
 import { ExamsModal } from "@/components/dashboard/exams-modal";
 import type { DashboardData, DashboardEvent } from "@/lib/dashboard";
 
@@ -57,13 +56,14 @@ export function QuickStats({
   stats,
   assignments,
   exams,
+  onAnnouncementsClick,
 }: {
   stats: DashboardData["stats"];
   assignments: DashboardEvent[];
   exams: DashboardEvent[];
+  onAnnouncementsClick?: () => void;
 }) {
   const [assignmentsOpen, setAssignmentsOpen] = useState(false);
-  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [examsOpen, setExamsOpen] = useState(false);
   return (
     <>
@@ -90,13 +90,13 @@ export function QuickStats({
           icon={Notification03Icon}
           value={String(stats.unreadAnnouncements)}
           label="Unread announcements"
-          onClick={() => setAnnouncementsOpen(true)}
+          onClick={onAnnouncementsClick}
         />
         <Stat
           icon={ClipboardListIcon}
           value={String(stats.upcomingAssignments)}
           label="Upcoming assignments"
-          onClick={() => setAssignmentsOpen(true)}
+          onClick={assignments.length > 0 ? () => setAssignmentsOpen(true) : undefined}
         />
       </div>
 
@@ -105,8 +105,6 @@ export function QuickStats({
         onOpenChange={setAssignmentsOpen}
         assignments={assignments}
       />
-
-      <AnnouncementsModal open={announcementsOpen} onOpenChange={setAnnouncementsOpen} />
 
       <ExamsModal open={examsOpen} onOpenChange={setExamsOpen} exams={exams} />
     </>

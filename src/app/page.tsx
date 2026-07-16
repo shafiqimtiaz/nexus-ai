@@ -1,11 +1,7 @@
 import { getRole } from "@/lib/auth";
 import { getDashboardData } from "@/lib/dashboard";
-import { QuickStats } from "@/components/dashboard/quick-stats";
-import { UpcomingEvents } from "@/components/dashboard/upcoming-events";
-import { TodaysSchedule } from "@/components/dashboard/todays-schedule";
-import { RecentAnnouncements } from "@/components/dashboard/recent-announcements";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { PinnedResources } from "@/components/dashboard/pinned-resources";
-import { AgentActions } from "@/components/dashboard/agent-actions";
 import { SyncOnLoad } from "@/components/dashboard/sync-on-load";
 
 export const dynamic = "force-dynamic";
@@ -31,21 +27,15 @@ export default async function DashboardPage() {
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="min-w-0 flex-1 space-y-6">
-          <QuickStats
+          <DashboardShell
             stats={data.stats}
             assignments={data.upcomingAssignmentEvents}
             exams={data.upcomingEvents}
+            announcements={data.recentAnnouncements}
+            upcomingEvents={data.upcomingEvents}
+            todaysSchedule={data.todaysSchedule}
+            agentActions={data.agentActions}
           />
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <UpcomingEvents events={data.upcomingEvents} className="lg:col-span-2" />
-            <TodaysSchedule events={data.todaysSchedule} />
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-3">
-            <RecentAnnouncements items={data.recentAnnouncements} className="lg:col-span-2" />
-            <AgentActions items={data.agentActions} />
-          </div>
         </div>
 
         <aside className="flex w-full shrink-0 flex-col lg:w-64 xl:w-72">

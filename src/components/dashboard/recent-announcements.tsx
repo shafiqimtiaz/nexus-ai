@@ -34,9 +34,11 @@ function formatPlatform(type: string): string {
 export function RecentAnnouncements({
   items,
   className,
+  onViewAll,
 }: {
   items: DashboardAnnouncement[];
   className?: string;
+  onViewAll?: (id: string) => void;
 }) {
   const [platform, setPlatform] = useState("all");
   const [visibleCount, setVisibleCount] = useState(BATCH_SIZE);
@@ -185,18 +187,13 @@ export function RecentAnnouncements({
                         key={item.id}
                         className="flex flex-1 flex-col justify-center py-3 first:pt-0 last:pb-0"
                       >
-                        {item.source_url ? (
-                          <a
-                            href={item.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block cursor-pointer rounded-md transition-colors hover:bg-muted/60"
-                          >
-                            {body}
-                          </a>
-                        ) : (
-                          body
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onViewAll?.(item.id)}
+                          className="block w-full cursor-pointer rounded-md text-left transition-colors hover:bg-muted/60"
+                        >
+                          {body}
+                        </button>
                       </li>
                     );
                   })}
