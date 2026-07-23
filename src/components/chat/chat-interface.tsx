@@ -409,12 +409,6 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
             <option value="gemini-flash-latest" className="bg-card text-foreground">
               Gemini Flash
             </option>
-            <option value="gemini-3.1-flash-lite" className="bg-card text-foreground">
-              Gemini 3.1 Lite
-            </option>
-            <option value="gemini-3.5-flash" className="bg-card text-foreground">
-              Gemini 3.5 Flash
-            </option>
           </select>
         )}
         <Input

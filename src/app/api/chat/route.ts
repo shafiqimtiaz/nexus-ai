@@ -10,8 +10,6 @@ import { createServerClient } from "@/lib/supabase/server";
 const ALLOWED_MODELS = [
   "gemini-flash-lite-latest",
   "gemini-flash-latest",
-  "gemini-3.1-flash-lite",
-  "gemini-3.5-flash",
 ];
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
