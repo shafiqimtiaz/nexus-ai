@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  AiMagicIcon,
   ArrowExpand01Icon,
   ArrowShrink01Icon,
   Cancel01Icon,
@@ -74,11 +74,19 @@ export function ChatWidget({ role }: { role: Role }) {
               <Button
                 onClick={() => setOpen(true)}
                 aria-label="Open AI chat"
-                className="fixed right-5 bottom-5 z-40 size-14 rounded-full shadow-lg shadow-primary/30 ring-4 ring-background transition-transform hover:scale-105 sm:right-6 sm:bottom-6"
+                variant="outline"
+                className="fixed right-5 bottom-5 z-40 size-14 rounded-full bg-card shadow-lg transition-transform hover:scale-105 sm:right-6 sm:bottom-6"
               />
             }
           >
-            <HugeiconsIcon icon={AiMagicIcon} className="size-6" />
+            <Image
+              src="/nexus-icon.png"
+              alt=""
+              width={36}
+              height={36}
+              className="size-9"
+              priority
+            />
           </TooltipTrigger>
           <TooltipContent side="left">
             Ask Nexus <Kbd className="bg-background/20 text-background">⌘K</Kbd>

@@ -96,7 +96,7 @@ export function Sidebar() {
           aria-label="Nexus home"
           className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         >
-          <Brand showWordmark={!collapsed} onDark />
+          <Brand showWordmark={!collapsed} />
         </Link>
       </div>
 

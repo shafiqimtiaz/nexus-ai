@@ -119,7 +119,7 @@ export function ResourceCard({
             disabled={busy}
             aria-label={resource.is_pinned ? "Unpin resource" : "Pin resource"}
             onPressedChange={() => togglePin.mutate()}
-            className="size-8 data-pressed:bg-highlight/20 data-pressed:text-amber-700 dark:data-pressed:text-amber-300"
+            className="size-8 data-pressed:bg-primary/10 data-pressed:text-primary"
           >
             <HugeiconsIcon icon={PinIcon} className={cn(resource.is_pinned && "fill-current")} />
           </Toggle>

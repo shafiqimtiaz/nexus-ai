@@ -80,7 +80,7 @@ export default function LoginPage() {
             aria-hidden
             className="pointer-events-none absolute -bottom-24 -left-16 size-64 rounded-full bg-highlight/20 blur-3xl"
           />
-          <Brand className="relative" onDark />
+          <Brand className="relative" />
           <div className="relative space-y-6">
             <h1 className="max-w-sm text-4xl leading-[1.1] font-semibold tracking-tight text-sidebar-accent-foreground">
               Your whole semester, in one calm place.

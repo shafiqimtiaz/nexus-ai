@@ -71,7 +71,7 @@ export function AgentActions({
           <ul className="divide-y divide-border">
             {visible.map((item) => {
               let icon = SparklesIcon;
-              let tone = "bg-highlight/20 text-amber-700 dark:text-amber-300";
+              let tone = "bg-primary/10 text-primary";
               if (item.action_type === "calendar") {
                 icon = Calendar03Icon;
                 tone = "bg-blue-500/12 text-blue-700 dark:text-blue-300";

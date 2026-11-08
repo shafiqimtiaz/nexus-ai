@@ -35,7 +35,7 @@ export function MobileNav() {
         <SheetHeader className="h-16 justify-center px-5">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <SheetDescription className="sr-only">Move between Nexus sections</SheetDescription>
-          <Brand onDark />
+          <Brand />
         </SheetHeader>
         <div className="px-3 pt-2">
           <NavLinks onNavigate={() => setOpen(false)} />
