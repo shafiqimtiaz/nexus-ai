@@ -75,7 +75,8 @@ export function ChatWidget({ role }: { role: Role }) {
                 onClick={() => setOpen(true)}
                 aria-label="Open AI chat"
                 variant="outline"
-                className="fixed right-5 bottom-5 z-40 size-14 rounded-full bg-card shadow-lg transition-transform hover:scale-105 sm:right-6 sm:bottom-6"
+                size="icon"
+                className="fixed right-5 bottom-5 z-40 size-14 rounded-full bg-card p-0 shadow-lg transition-transform hover:scale-105 sm:right-6 sm:bottom-6"
               />
             }
           >
@@ -84,7 +85,7 @@ export function ChatWidget({ role }: { role: Role }) {
               alt=""
               width={36}
               height={36}
-              className="size-9"
+              className="size-9 shrink-0 object-contain"
               priority
             />
           </TooltipTrigger>
