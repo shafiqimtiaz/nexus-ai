@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Loading03Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { MessageAdd01Icon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import type { Role } from "@/lib/auth";
 import { OPEN_CHAT_EVENT, type OpenChatDetail } from "@/lib/chat-events";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -240,36 +242,35 @@ export function ChatInterface({
           {isDemo && hasKey ? (
             <span className="truncate text-amber-700 dark:text-amber-400">
               Demo · using your Gemini key ·{" "}
-              <button
-                type="button"
+              <Button
+                variant="link"
+                size="xs"
                 onClick={clearDemoKey}
-                className="cursor-pointer font-semibold underline underline-offset-2 hover:opacity-80"
+                className="h-auto p-0 text-xs font-semibold text-inherit"
               >
                 Change key
-              </button>
+              </Button>
             </span>
           ) : (
             <span />
           )}
           {messages.length > 0 && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={clear}
-              className="flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="shrink-0 text-muted-foreground"
             >
-              <HugeiconsIcon icon={Delete02Icon} className="h-3.5 w-3.5" />
+              <HugeiconsIcon icon={MessageAdd01Icon} />
               New chat
-            </button>
+            </Button>
           )}
         </div>
       )}
 
       {hasKey === null && (
         <div className="flex flex-1 items-center justify-center">
-          <HugeiconsIcon
-            icon={Loading03Icon}
-            className="h-8 w-8 animate-spin text-muted-foreground"
-          />
+          <Spinner className="size-7 text-muted-foreground" />
         </div>
       )}
 
@@ -278,7 +279,7 @@ export function ChatInterface({
       {hasKey && (
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-xl border bg-card p-4"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-xl border bg-card/60 p-4"
         >
           {messages.length === 0 ? (
             <ChatEmptyState compact={!expanded} onPick={(p) => void ask(p, messages)} />

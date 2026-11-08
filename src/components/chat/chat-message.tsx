@@ -4,6 +4,7 @@ import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Copy01Icon, Tick02Icon, RefreshIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { ToolCallDisplay, type ToolCall } from "./tool-call-display";
 import { Markdown } from "./markdown";
 
@@ -30,9 +31,6 @@ function TypingDots() {
   );
 }
 
-const actionClass =
-  "flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
-
 export function ChatMessageBubble({
   message,
   pending,
@@ -54,7 +52,7 @@ export function ChatMessageBubble({
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground">
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-3.5 py-2 text-sm text-primary-foreground shadow-xs">
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
         </div>
       </div>
@@ -63,7 +61,7 @@ export function ChatMessageBubble({
 
   return (
     <div className="group/msg flex flex-col items-start gap-1">
-      <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-muted px-3.5 py-2 text-sm text-foreground">
+      <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-muted/70 px-3.5 py-2 text-sm text-foreground ring-1 ring-foreground/5">
         {message.toolCalls.map((call) => (
           <ToolCallDisplay key={call.toolCallId} call={call} />
         ))}
@@ -76,15 +74,20 @@ export function ChatMessageBubble({
             onRetry && "opacity-100"
           )}
         >
-          <button type="button" onClick={() => void copy()} className={actionClass}>
-            <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} className="h-3 w-3" />
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void copy()}
+            className="text-muted-foreground"
+          >
+            <HugeiconsIcon icon={copied ? Tick02Icon : Copy01Icon} />
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
           {onRetry && (
-            <button type="button" onClick={onRetry} className={actionClass}>
-              <HugeiconsIcon icon={RefreshIcon} className="h-3 w-3" />
+            <Button variant="ghost" size="xs" onClick={onRetry} className="text-muted-foreground">
+              <HugeiconsIcon icon={RefreshIcon} />
               Retry
-            </button>
+            </Button>
           )}
           {message.model && (
             <span className="select-none text-[10px] text-muted-foreground/60">

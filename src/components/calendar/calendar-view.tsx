@@ -15,9 +15,11 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ArrowLeft01Icon, ArrowRight01Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EventBadge, EVENT_META } from "@/components/dashboard/event-badge";
+import { EVENT_META } from "@/components/dashboard/event-badge";
+import { UpcomingList } from "@/components/calendar/upcoming-list";
+import { PageHeader } from "@/components/layout/page-header";
 import { EventForm } from "@/components/calendar/event-form";
 import { DayEventsDialog } from "@/components/calendar/day-events-dialog";
 import type { EventType } from "@/lib/dashboard";
@@ -106,51 +108,50 @@ export function CalendarView({ role }: { role: Role }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Calendar</h1>
-          <p className="text-sm text-muted-foreground">
-            Your exams, assignments, and study blocks in one place.
-          </p>
-        </div>
-        {canEdit && (
-          <Button onClick={() => setDialog({ mode: "create", date: new Date() })}>
-            <HugeiconsIcon icon={PlusSignIcon} className="h-4 w-4" />
-            Add event
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        eyebrow="Calendar"
+        title="Your term, mapped out"
+        description="Exams, deadlines, and study blocks in one place. Click any day to see or add what's on."
+        actions={
+          canEdit && (
+            <Button onClick={() => setDialog({ mode: "create", date: new Date() })}>
+              <HugeiconsIcon icon={PlusSignIcon} />
+              Add event
+            </Button>
+          )
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0">
-              <CardTitle>{format(currentMonth, "MMMM yyyy")}</CardTitle>
-              <div className="flex items-center gap-1">
+            <CardHeader>
+              <CardTitle className="text-xl">{format(currentMonth, "MMMM yyyy")}</CardTitle>
+              <CardAction className="flex items-center gap-1">
                 <Button
                   variant="outline"
-                  size="icon-sm"
+                  size="icon"
                   aria-label="Previous month"
                   onClick={() => setCurrentMonth((m) => subMonths(m, 1))}
                 >
-                  <HugeiconsIcon icon={ArrowLeft01Icon} className="h-4 w-4" />
+                  <HugeiconsIcon icon={ArrowLeft01Icon} />
                 </Button>
                 <Button
                   variant="outline"
-                  size="sm"
+                  size="lg"
                   onClick={() => setCurrentMonth(startOfMonth(new Date()))}
                 >
                   Today
                 </Button>
                 <Button
                   variant="outline"
-                  size="icon-sm"
+                  size="icon"
                   aria-label="Next month"
                   onClick={() => setCurrentMonth((m) => addMonths(m, 1))}
                 >
-                  <HugeiconsIcon icon={ArrowRight01Icon} className="h-4 w-4" />
+                  <HugeiconsIcon icon={ArrowRight01Icon} />
                 </Button>
-              </div>
+              </CardAction>
             </CardHeader>
             <CardContent>
               <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
@@ -159,7 +160,7 @@ export function CalendarView({ role }: { role: Role }) {
                     key={type}
                     className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
                   >
-                    <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
+                    <span className={cn("size-2 rounded-full", meta.dot)} />
                     {meta.label}
                   </span>
                 ))}
@@ -188,45 +189,50 @@ export function CalendarView({ role }: { role: Role }) {
                           : undefined
                       }
                       className={cn(
-                        "min-h-24 border-b border-r p-1.5 [&:nth-child(7n)]:border-r-0",
+                        "min-h-24 border-b border-r p-1 sm:p-1.5 [&:nth-child(7n)]:border-r-0",
                         !inMonth && "bg-muted/30 text-muted-foreground",
                         canEdit && "cursor-pointer transition-colors hover:bg-accent"
                       )}
                     >
                       <div className="mb-1 flex justify-end">
-                        <span
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={!canEdit}
+                          aria-label={format(day, "EEEE, MMMM d")}
+                          aria-current={today ? "date" : undefined}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDialog({ mode: "day", date: day, events: dayEvents });
+                          }}
                           className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-full text-xs",
-                            today && "bg-primary font-semibold text-primary-foreground"
+                            "size-6 rounded-full text-xs",
+                            today &&
+                              "bg-primary font-semibold text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground disabled:opacity-100"
                           )}
                         >
                           {format(day, "d")}
-                        </span>
+                        </Button>
                       </div>
                       <div className="space-y-1">
                         {dayEvents.slice(0, MAX_PILLS).map((ev) => (
-                          <button
+                          <Button
                             key={ev.id}
-                            type="button"
+                            variant="tint"
                             disabled={!canEdit}
-                            onClick={
-                              canEdit
-                                ? (e) => {
-                                    e.stopPropagation();
-                                    setDialog({ mode: "edit", event: ev });
-                                  }
-                                : undefined
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDialog({ mode: "edit", event: ev });
+                            }}
                             title={ev.title}
                             className={cn(
-                              "block w-full truncate rounded px-1.5 py-0.5 text-left text-xs",
+                              "h-auto w-full justify-start rounded px-1.5 py-0.5 text-xs font-medium disabled:opacity-100",
                               (EVENT_META[ev.event_type] ?? EVENT_META.other).className,
-                              ev.status === "cancelled" && "line-through opacity-50",
-                              canEdit && "cursor-pointer"
+                              ev.status === "cancelled" && "line-through opacity-50"
                             )}
                           >
-                            {ev.title}
-                          </button>
+                            <span className="truncate">{ev.title}</span>
+                          </Button>
                         ))}
                         {extra > 0 && (
                           <div className="px-1.5 text-xs text-muted-foreground">+{extra} more</div>
@@ -240,52 +246,10 @@ export function CalendarView({ role }: { role: Role }) {
           </Card>
         </div>
 
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcoming.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Nothing coming up.</p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {upcoming.map((ev) => {
-                    const start = new Date(ev.start_time);
-                    const content = (
-                      <>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <EventBadge type={ev.event_type} />
-                            <span className="truncate font-medium">{ev.title}</span>
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {format(start, "EEE, MMM d · p")}
-                          </div>
-                        </div>
-                      </>
-                    );
-                    return (
-                      <li key={ev.id} className="py-3 first:pt-0 last:pb-0">
-                        {canEdit ? (
-                          <button
-                            type="button"
-                            onClick={() => setDialog({ mode: "edit", event: ev })}
-                            className="w-full rounded text-left transition-colors hover:opacity-80"
-                          >
-                            {content}
-                          </button>
-                        ) : (
-                          content
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <UpcomingList
+          events={upcoming}
+          onSelect={canEdit ? (ev) => setDialog({ mode: "edit", event: ev }) : undefined}
+        />
       </div>
 
       {canEdit && dialog && dialog.mode === "day" && (

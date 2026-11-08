@@ -26,7 +26,7 @@ export function SyncOnLoad({ role }: { role: Role }) {
       const expired = rows.filter((r) => r.authExpired).map((r) => r.type);
       if (expired.length > 0) {
         toast.error(
-          `${expired.join(" and ")} token expired. Reconnect it in Options to resume syncing.`
+          `${expired.join(" and ")} token expired. Reconnect it in Settings to resume syncing.`
         );
       }
       const didWork = !Array.isArray(data?.synced) || rows.some((r) => !r.skipped);

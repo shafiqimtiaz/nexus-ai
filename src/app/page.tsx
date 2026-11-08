@@ -7,7 +7,7 @@ import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Dashboard — Nexus",
+  title: "Today — Nexus",
 };
 
 export default async function DashboardPage() {
@@ -15,13 +15,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <DashboardGreeting
           todaysSchedule={data.todaysSchedule}
           upcomingEvents={data.upcomingEvents}
         />
         <SyncOnLoad role={role} />
-      </header>
+      </div>
 
       <DashboardShell
         stats={data.stats}

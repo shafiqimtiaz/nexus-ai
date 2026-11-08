@@ -1,14 +1,22 @@
 "use client";
 
-import Image from "next/image";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import {
+  AiMagicIcon,
   Calendar03Icon,
   Notification03Icon,
   BookOpen01Icon,
   Clock01Icon,
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 
 const SUGGESTIONS: { icon: IconSvgElement; label: string; prompt: string }[] = [
   {
@@ -42,28 +50,30 @@ export function ChatEmptyState({
   onPick: (prompt: string) => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 py-6 text-center">
-      <div className="space-y-2">
-        <Image src="/nexus-icon.png" alt="" width={44} height={44} className="mx-auto h-11 w-11" />
-        <h3 className="text-base font-semibold tracking-tight">How can I help?</h3>
-        <p className="mx-auto max-w-sm text-xs text-muted-foreground">
+    <Empty className="h-full gap-5 border-0 py-6">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <HugeiconsIcon icon={AiMagicIcon} />
+        </EmptyMedia>
+        <EmptyTitle className="text-xl">What are we studying today?</EmptyTitle>
+        <EmptyDescription>
           I can check your schedule, plan study sessions, summarize announcements, and manage your
-          resources.
-        </p>
-      </div>
+          library.
+        </EmptyDescription>
+      </EmptyHeader>
       <div className={cn("grid w-full max-w-xl gap-2", !compact && "sm:grid-cols-2")}>
         {SUGGESTIONS.map((s) => (
-          <button
+          <Button
             key={s.label}
-            type="button"
+            variant="outline"
             onClick={() => onPick(s.prompt)}
-            className="flex cursor-pointer items-center gap-2.5 rounded-lg border bg-background px-3 py-2.5 text-left text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5"
+            className="h-auto justify-start gap-2.5 bg-background px-3 py-2.5 text-left text-xs whitespace-normal hover:border-primary/40 hover:bg-accent"
           >
-            <HugeiconsIcon icon={s.icon} className="h-4 w-4 shrink-0 text-primary" />
+            <HugeiconsIcon icon={s.icon} className="text-primary" />
             {s.label}
-          </button>
+          </Button>
         ))}
       </div>
-    </div>
+    </Empty>
   );
 }

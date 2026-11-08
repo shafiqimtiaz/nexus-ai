@@ -1,115 +1,71 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Megaphone01Icon, ArrowDown01Icon, ExternalLinkIcon } from "@hugeicons/core-free-icons";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
+import { AnnouncementMeta } from "@/components/dashboard/announcement-meta";
 import { cn } from "@/lib/utils";
 import type { DashboardAnnouncement } from "@/lib/dashboard";
 
-const PAGE_SIZE = 5; 
+const PAGE_SIZE = 5;
 const HIGHLIGHT_DURATION = 2000;
 
-const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium";
-
-const PLATFORM_LABELS: Record<string, string> = {
-  google_classroom: "Google Classroom",
-  discord: "Discord",
-  slack: "Slack",
-};
-
-const PLATFORM_STYLES: Record<string, string> = {
-  google_classroom: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  discord: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-  slack: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-};
-
-function formatPlatform(type: string): string {
-  return PLATFORM_LABELS[type] ?? type;
-}
-
-function AnnouncementRow({ item, highlighted }: { item: DashboardAnnouncement; highlighted?: boolean }) {
-  const [expanded, setExpanded] = useState(false);
-
+function AnnouncementRow({
+  item,
+  highlighted,
+}: {
+  item: DashboardAnnouncement;
+  highlighted?: boolean;
+}) {
   return (
-    <div
+    <Collapsible
       data-announcement-id={item.id}
       className={cn(
-        "rounded-lg border transition-all duration-300",
+        "rounded-lg border bg-card transition-all duration-300",
         highlighted && "ring-2 ring-primary"
       )}
     >
-      <button
-        type="button"
-        onClick={() => setExpanded((prev) => !prev)}
-        className={cn(
-          "flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-          expanded && "rounded-b-none"
-        )}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <HugeiconsIcon
-            icon={ArrowDown01Icon}
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180"
-            )}
-          />
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate text-sm font-medium">{item.title || "Announcement"}</span>
-            </div>
-            {item.ai_summary && (
-              <p className="mt-0.5 text-xs text-muted-foreground">{item.ai_summary}</p>
-            )}
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {item.author && (
-                <span className={cn(PILL_BASE, "bg-blue-500/10 text-blue-600 dark:text-blue-400")}>
-                  {item.author}
-                </span>
-              )}
-              {item.announced_at && (
-                <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>
-                  {formatDistanceToNow(new Date(item.announced_at), { addSuffix: true })}
-                </span>
-              )}
-              {item.platform && (
-                <span
-                  className={cn(
-                    PILL_BASE,
-                    PLATFORM_STYLES[item.platform] ?? "bg-muted text-muted-foreground"
-                  )}
-                >
-                  {formatPlatform(item.platform)}
-                </span>
-              )}
-            </div>
-          </div>
+      <CollapsibleTrigger className="group/trigger flex w-full cursor-pointer items-center gap-3 rounded-lg px-4 py-3 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          className="size-4 shrink-0 text-muted-foreground transition-transform group-data-panel-open/trigger:rotate-180"
+        />
+        <div className="min-w-0 space-y-1">
+          <span className="block truncate text-sm font-medium">{item.title || "Announcement"}</span>
+          {item.ai_summary && <p className="text-xs text-muted-foreground">{item.ai_summary}</p>}
+          <AnnouncementMeta item={item} />
         </div>
-      </button>
-
-      {expanded && (
+      </CollapsibleTrigger>
+      <CollapsibleContent>
         <div className="border-t px-4 py-3 text-sm">
           {item.source_url && (
             <a
               href={item.source_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="mb-2 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
-              <HugeiconsIcon icon={ExternalLinkIcon} className="h-3 w-3" />
+              <HugeiconsIcon icon={ExternalLinkIcon} className="size-3" />
               Open in source
             </a>
           )}
           {item.content && (
-            <p className="leading-relaxed text-muted-foreground whitespace-pre-wrap">
+            <p className="leading-relaxed whitespace-pre-wrap text-muted-foreground">
               {item.content}
             </p>
           )}
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -208,7 +164,9 @@ export function AnnouncementsModal({
 
   useEffect(() => {
     if (!open || !initialScrollToId || items.length === 0) return;
-    const el = scrollContainerRef.current?.querySelector(`[data-announcement-id="${initialScrollToId}"]`);
+    const el = scrollContainerRef.current?.querySelector(
+      `[data-announcement-id="${initialScrollToId}"]`
+    );
     if (!el) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     setHighlightedId(initialScrollToId);
@@ -225,14 +183,17 @@ export function AnnouncementsModal({
       <DialogContent className="sm:max-w-5xl !duration-0 data-open:animate-none data-closed:animate-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HugeiconsIcon icon={Megaphone01Icon} className="h-5 w-5 text-primary" />
+            <HugeiconsIcon icon={Megaphone01Icon} className="size-5 text-primary" />
             All announcements
           </DialogTitle>
+          <DialogDescription>
+            Everything your connected platforms have posted, newest first.
+          </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="py-12 text-center">
-            <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div className="flex justify-center py-12">
+            <Spinner className="size-5 text-primary" />
           </div>
         ) : items.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">No announcements yet.</p>
@@ -246,8 +207,8 @@ export function AnnouncementsModal({
             ))}
             {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
             {fetchingMore && (
-              <div className="py-3 text-center">
-                <div className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <div className="flex justify-center py-3">
+                <Spinner className="size-5 text-primary" />
               </div>
             )}
           </div>

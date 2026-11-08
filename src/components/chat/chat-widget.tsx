@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
+  AiMagicIcon,
   ArrowExpand01Icon,
   ArrowShrink01Icon,
   Cancel01Icon,
@@ -14,7 +14,28 @@ import {
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/auth";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Brand } from "@/components/layout/brand";
 import { ChatInterface } from "./chat-interface";
+
+function IconAction({
+  label,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & { label: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<Button variant="ghost" size="icon-sm" aria-label={label} {...props} />}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
 
 export function ChatWidget({ role }: { role: Role }) {
   const pathname = usePathname();
@@ -46,26 +67,25 @@ export function ChatWidget({ role }: { role: Role }) {
 
   return (
     <>
-      {/* Bubble */}
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          aria-label="Open AI chat"
-          title="Ask Nexus (⌘K)"
-          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border transition-transform hover:scale-105"
-        >
-          <Image
-            src="/nexus-icon.png"
-            alt="Nexus"
-            width={36}
-            height={36}
-            className="h-9 w-9"
-            priority
-          />
-        </button>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                onClick={() => setOpen(true)}
+                aria-label="Open AI chat"
+                className="fixed right-5 bottom-5 z-40 size-14 rounded-full shadow-lg shadow-primary/30 ring-4 ring-background transition-transform hover:scale-105 sm:right-6 sm:bottom-6"
+              />
+            }
+          >
+            <HugeiconsIcon icon={AiMagicIcon} className="size-6" />
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            Ask Nexus <Kbd className="bg-background/20 text-background">⌘K</Kbd>
+          </TooltipContent>
+        </Tooltip>
       )}
 
-      {/* Backdrop for expanded mode */}
       {open && expanded && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
@@ -73,52 +93,37 @@ export function ChatWidget({ role }: { role: Role }) {
         />
       )}
 
-      {/* Panel — kept mounted while closed so the conversation and in-flight replies survive */}
       <div
         className={cn(
-          "fixed z-50 flex flex-col rounded-2xl border bg-background shadow-2xl",
+          "fixed z-50 flex flex-col rounded-2xl border bg-background shadow-2xl ring-1 ring-foreground/5",
           !open && "hidden",
           expanded
-            ? "inset-4 sm:inset-6 md:inset-10"
-            : "bottom-6 right-6 h-[600px] max-h-[calc(100vh-3rem)] w-96 max-w-[calc(100vw-3rem)]"
+            ? "inset-3 sm:inset-6 md:inset-10"
+            : "right-3 bottom-3 h-[600px] max-h-[calc(100dvh-1.5rem)] w-96 max-w-[calc(100vw-1.5rem)] sm:right-6 sm:bottom-6"
         )}
       >
-        {/* Header */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-          <div className="flex items-center gap-2">
-            <Image src="/nexus-icon.png" alt="Nexus" width={24} height={24} className="h-6 w-6" />
-            <span className="text-sm font-semibold tracking-tight">Nexus AI</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Link
-              href="/options"
-              aria-label="Customize prompt"
-              title="Customize prompt"
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+          <Brand />
+          <div className="flex items-center gap-0.5">
+            <IconAction
+              label="Customize AI rules"
+              render={<Link href="/options" />}
+              nativeButton={false}
             >
-              <HugeiconsIcon icon={Settings01Icon} className="h-4 w-4" />
-            </Link>
-            <button
+              <HugeiconsIcon icon={Settings01Icon} />
+            </IconAction>
+            <IconAction
+              label={expanded ? "Minimize chat" : "Expand chat"}
               onClick={() => setExpanded((e) => !e)}
-              aria-label={expanded ? "Minimize chat" : "Expand chat"}
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
             >
-              <HugeiconsIcon
-                icon={expanded ? ArrowShrink01Icon : ArrowExpand01Icon}
-                className="h-4 w-4"
-              />
-            </button>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="Close chat"
-              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
-            </button>
+              <HugeiconsIcon icon={expanded ? ArrowShrink01Icon : ArrowExpand01Icon} />
+            </IconAction>
+            <IconAction label="Close chat" onClick={() => setOpen(false)}>
+              <HugeiconsIcon icon={Cancel01Icon} />
+            </IconAction>
           </div>
         </div>
 
-        {/* Body */}
         <div className="min-h-0 flex-1 p-4">
           <ChatInterface role={role} expanded={expanded} autoFocus={open} />
         </div>

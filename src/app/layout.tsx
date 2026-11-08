@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Sidebar } from "@/components/layout/sidebar";
@@ -10,6 +10,12 @@ import { getRole } from "@/lib/auth";
 const geistSans = Geist({
   variable: "--font-sans",
   subsets: ["latin"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-display",
+  subsets: ["latin"],
+  axes: ["opsz"],
 });
 
 const geistMono = Geist_Mono({
@@ -32,16 +38,16 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full">
         <Providers>
-          <div className="flex h-screen">
+          <div className="flex h-dvh">
             <Sidebar />
             <div className="flex min-w-0 flex-1 flex-col">
               <Header role={role} />
-              <main className="flex-1 overflow-auto p-6">{children}</main>
+              <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">{children}</main>
             </div>
           </div>
           <ChatWidget role={role} />

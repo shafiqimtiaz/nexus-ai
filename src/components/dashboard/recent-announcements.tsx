@@ -1,35 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ExternalLinkIcon, Megaphone01Icon } from "@hugeicons/core-free-icons";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ExternalLinkIcon, Megaphone01Icon, InboxIcon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DashboardCard } from "@/components/dashboard/dashboard-card";
+import { AnnouncementMeta } from "@/components/dashboard/announcement-meta";
+import { formatPlatform } from "@/components/dashboard/platform-pill";
 import { cn } from "@/lib/utils";
 import type { DashboardAnnouncement } from "@/lib/dashboard";
 
 const BATCH_SIZE = 8;
-
-const SELECT_CLASS =
-  "rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring";
-
-const PLATFORM_LABELS: Record<string, string> = {
-  google_classroom: "Google Classroom",
-  discord: "Discord",
-  slack: "Slack",
-};
-
-const PLATFORM_STYLES: Record<string, string> = {
-  google_classroom: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  discord: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-  slack: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-};
-
-const PILL_BASE = "inline-flex items-center rounded-full px-2 py-0.5 font-medium";
-
-function formatPlatform(type: string): string {
-  return PLATFORM_LABELS[type] ?? type;
-}
 
 export function RecentAnnouncements({
   items,
@@ -84,126 +79,87 @@ export function RecentAnnouncements({
     return () => observer.disconnect();
   }, [hasMore, filtered.length]);
 
-  return (
-    <Card className={cn("self-start", className)}>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="flex items-center gap-2">
-            <HugeiconsIcon icon={Megaphone01Icon} className="h-4 w-4 text-primary" />
-            Recent announcements
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            {platformOptions.length > 0 && (
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                className={SELECT_CLASS}
-                aria-label="Filter by platform"
-              >
-                <option value="all">All platforms</option>
-                {platformOptions.map((p) => (
-                  <option key={p} value={p}>
-                    {formatPlatform(p)}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col">
-        {items.length === 0 ? (
-          <p className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
-            No announcements yet.
-          </p>
-        ) : (
-          <>
-            {filtered.length === 0 ? (
-              <p className="flex flex-1 items-center justify-center text-center text-sm text-muted-foreground">
-                No announcements match these filters.
-              </p>
-            ) : (
-              <div
-                ref={scrollContainerRef}
-                className="max-h-80 min-h-0 flex-1 overflow-y-auto scrollbar-none pr-1"
-              >
-                <ul className="flex min-h-full flex-col divide-y divide-border">
-                  {visible.map((item) => {
-                    const body = (
-                      <>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="truncate text-sm font-medium">
-                            {item.title || "Announcement"}
-                          </span>
-                          {item.source_url && (
-                            <HugeiconsIcon
-                              icon={ExternalLinkIcon}
-                              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
-                            />
-                          )}
-                        </div>
-                        <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                          {item.ai_summary || item.content}
-                        </p>
-                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                          {item.author && (
-                            <span
-                              className={cn(
-                                PILL_BASE,
-                                "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                              )}
-                            >
-                              {item.author}
-                            </span>
-                          )}
-                          {item.announced_at && (
-                            <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>
-                              {formatDistanceToNow(new Date(item.announced_at), {
-                                addSuffix: true,
-                              })}
-                            </span>
-                          )}
-                          {item.channel && (
-                            <span className={cn(PILL_BASE, "bg-muted text-muted-foreground")}>
-                              {item.channel}
-                            </span>
-                          )}
-                          {item.platform && (
-                            <span
-                              className={cn(
-                                PILL_BASE,
-                                PLATFORM_STYLES[item.platform] ?? "bg-muted text-muted-foreground"
-                              )}
-                            >
-                              {formatPlatform(item.platform)}
-                            </span>
-                          )}
-                        </div>
-                      </>
-                    );
+  const platformItems = [
+    { value: "all", label: "All platforms" },
+    ...platformOptions.map((p) => ({ value: p, label: formatPlatform(p) })),
+  ];
 
-                    return (
-                      <li
-                        key={item.id}
-                        className="flex flex-1 flex-col justify-center py-3 first:pt-0 last:pb-0"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => onViewAll?.(item.id)}
-                          className="block w-full cursor-pointer rounded-md text-left transition-colors hover:bg-muted/60"
-                        >
-                          {body}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+  return (
+    <DashboardCard
+      icon={Megaphone01Icon}
+      title="Announcements"
+      className={cn("self-start", className)}
+      action={
+        platformOptions.length > 0 && (
+          <Select items={platformItems} value={platform} onValueChange={(v) => v && setPlatform(v)}>
+            <SelectTrigger size="sm" aria-label="Filter by platform" className="min-w-36">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              {platformItems.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  {p.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )
+      }
+    >
+      {items.length === 0 || filtered.length === 0 ? (
+        <Empty className="p-4">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={InboxIcon} />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">
+              {items.length === 0 ? "Inbox zero" : "No matches"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {items.length === 0
+                ? "Announcements from your connected platforms will land here."
+                : "No announcements from that platform yet."}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          className="max-h-80 min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-none"
+        >
+          <ul className="flex min-h-full flex-col divide-y divide-border">
+            {visible.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-1 flex-col justify-center py-1 first:pt-0 last:pb-0"
+              >
+                <Button
+                  variant="ghost"
+                  onClick={() => onViewAll?.(item.id)}
+                  className="-mx-2 h-auto w-[calc(100%+1rem)] flex-col items-stretch justify-start gap-0 px-2 py-2.5 text-left whitespace-normal"
+                >
+                  <span className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-medium">
+                      {item.title || "Announcement"}
+                    </span>
+                    {item.source_url && (
+                      <HugeiconsIcon
+                        icon={ExternalLinkIcon}
+                        className="size-3.5 shrink-0 text-muted-foreground"
+                      />
+                    )}
+                  </span>
+                  <span className="mt-1 mb-2 line-clamp-3 text-xs leading-relaxed font-normal whitespace-pre-wrap text-muted-foreground">
+                    {item.ai_summary || item.content}
+                  </span>
+                  <AnnouncementMeta item={item} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
+        </div>
+      )}
+    </DashboardCard>
   );
 }

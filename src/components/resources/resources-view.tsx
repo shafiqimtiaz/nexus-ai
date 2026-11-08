@@ -2,10 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { PlusSignIcon, Search01Icon } from "@hugeicons/core-free-icons";
+import { BookOpen01Icon, PlusSignIcon, Search01Icon } from "@hugeicons/core-free-icons";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { PageHeader } from "@/components/layout/page-header";
+import { labelTone } from "@/components/resources/label-tone";
 import { ResourceCard } from "@/components/resources/resource-card";
 import { ResourceForm } from "@/components/resources/resource-form";
 import type { Role } from "@/lib/auth";
@@ -42,6 +54,8 @@ async function fetchLabels(): Promise<Label[]> {
   return json.labels ?? [];
 }
 
+const ALL = "__all";
+
 type DialogState = { mode: "create" } | { mode: "edit"; resource: Resource } | null;
 
 export function ResourcesView({ role }: { role: Role }) {
@@ -75,91 +89,96 @@ export function ResourcesView({ role }: { role: Role }) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Resources</h1>
-          <p className="text-sm text-muted-foreground">
-            Your links, notes, and references — labelled and searchable.
-          </p>
-        </div>
-        {canEdit && (
-          <Button onClick={() => setDialog({ mode: "create" })}>
-            <HugeiconsIcon icon={PlusSignIcon} className="h-4 w-4" />
-            Add resource
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        eyebrow="Library"
+        title="Everything worth keeping"
+        description="Your links, notes, and references. Labelled, searchable, and one click from the dashboard when pinned."
+        actions={
+          canEdit && (
+            <Button onClick={() => setDialog({ mode: "create" })}>
+              <HugeiconsIcon icon={PlusSignIcon} />
+              Add resource
+            </Button>
+          )
+        }
+      />
 
       <div className="space-y-4">
-        <div className="relative max-w-md">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          />
-          <Input
+        <InputGroup className="max-w-md bg-card">
+          <InputGroupAddon>
+            <HugeiconsIcon icon={Search01Icon} />
+          </InputGroupAddon>
+          <InputGroupInput
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search resources…"
-            className="pl-8"
+            placeholder="Search your library…"
+            aria-label="Search resources"
           />
-        </div>
+        </InputGroup>
 
         {labels.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setActiveLabel(null)}
-              className={cn(
-                "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                activeLabel === null
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border text-muted-foreground hover:bg-muted"
-              )}
-            >
-              All
-            </button>
-            {labels.map((label) => {
-              const active = activeLabel === label.id;
-              return (
-                <button
-                  key={label.id}
-                  type="button"
-                  onClick={() => setActiveLabel(active ? null : label.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  {label.color && (
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: label.color }}
-                    />
-                  )}
-                  {label.name}
-                </button>
-              );
-            })}
-          </div>
+          <ToggleGroup
+            spacing={1}
+            aria-label="Filter by label"
+            className="w-full flex-wrap"
+            value={[activeLabel ?? ALL]}
+            onValueChange={(value) => {
+              const next = value[0];
+              if (next) setActiveLabel(next === ALL ? null : next);
+            }}
+          >
+            {[{ id: ALL, name: "All", color: null as string | null }, ...labels].map((label) => (
+              <ToggleGroupItem
+                key={label.id}
+                value={label.id}
+                variant="outline"
+                size="sm"
+                className="rounded-full bg-card data-pressed:border-primary data-pressed:bg-primary data-pressed:text-primary-foreground"
+              >
+                {label.id !== ALL && (
+                  <span className={cn("size-2 rounded-full", labelTone(label.color).dot)} />
+                )}
+                {label.name}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         )}
       </div>
 
       {isLoading ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">Loading…</p>
-      ) : resources.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-16 text-center">
-          <p className="text-sm text-muted-foreground">
-            {isFiltering
-              ? activeLabelName
-                ? `No matches for “${activeLabelName}”.`
-                : "No matches."
-              : canEdit
-                ? "No resources yet — add your first link."
-                : "No resources yet."}
-          </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-36 rounded-xl" />
+          ))}
         </div>
+      ) : resources.length === 0 ? (
+        <Empty className="border py-16">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={BookOpen01Icon} />
+            </EmptyMedia>
+            <EmptyTitle>
+              {isFiltering ? "Nothing matches that" : "Your library is empty"}
+            </EmptyTitle>
+            <EmptyDescription>
+              {isFiltering
+                ? activeLabelName
+                  ? `No resources labelled “${activeLabelName}” match your search.`
+                  : "Try a different search term or clear the filters."
+                : canEdit
+                  ? "Save syllabi, slide decks, and study guides here so they are one click away."
+                  : "Nothing has been saved yet."}
+            </EmptyDescription>
+          </EmptyHeader>
+          {!isFiltering && canEdit && (
+            <EmptyContent>
+              <Button onClick={() => setDialog({ mode: "create" })}>
+                <HugeiconsIcon icon={PlusSignIcon} />
+                Add your first link
+              </Button>
+            </EmptyContent>
+          )}
+        </Empty>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {resources.map((resource) => (

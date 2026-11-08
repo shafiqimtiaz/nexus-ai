@@ -1,9 +1,10 @@
 import { getRole } from "@/lib/auth";
+import { PageHeader } from "@/components/layout/page-header";
 import { PlatformCard } from "@/components/options/platform-card";
 import { AiRulesCard } from "@/components/options/ai-rules-card";
 
 export const metadata = {
-  title: "Options — Nexus",
+  title: "Settings — Nexus",
 };
 
 export default async function OptionsPage() {
@@ -11,12 +12,11 @@ export default async function OptionsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Options</h1>
-        <p className="text-sm text-muted-foreground">
-          Connect the platforms Nexus pulls your coursework and messages from.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Settings"
+        title="Connections and rules"
+        description="Connect the platforms Nexus pulls your coursework from, and teach the agent how you like to work."
+      />
 
       <div className="space-y-4">
         <AiRulesCard />

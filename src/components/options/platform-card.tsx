@@ -5,7 +5,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
   HashIcon,
   Key01Icon,
-  Loading03Icon,
   Mortarboard02Icon,
   Message01Icon,
   SparklesIcon,
@@ -24,8 +23,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import type { Role } from "@/lib/auth";
+import {
+  ClassroomHelp,
+  DiscordHelp,
+  SlackHelp,
+  SlackIcon,
+} from "@/components/options/platform-help";
 import { cn } from "@/lib/utils";
 
 type PlatformType = "google_classroom" | "discord" | "slack" | "gemini";
@@ -57,14 +64,6 @@ async function fetchPlatforms(): Promise<PlatformsResponse> {
 function formatSynced(iso: string | null): string {
   if (!iso) return "never synced";
   return `last synced ${new Date(iso).toLocaleString()}`;
-}
-
-function SlackIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
-      <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523 2.528 2.528 0 0 1-2.522-2.523 2.528 2.528 0 0 1 2.522-2.52h2.52v2.52zm1.261 0a2.528 2.528 0 0 1 2.52-2.52h5.043a2.528 2.528 0 0 1 2.522 2.52v5.043a2.528 2.528 0 0 1-2.522 2.52H8.823a2.528 2.528 0 0 1-2.52-2.52v-5.043zm2.52-10.123a2.528 2.528 0 0 1-2.52-2.522A2.528 2.528 0 0 1 8.823 0a2.528 2.528 0 0 1 2.52 2.52v2.522h-2.52zm0 1.261a2.528 2.528 0 0 1 2.52 2.52v5.043a2.528 2.528 0 0 1-2.52 2.522H3.78a2.528 2.528 0 0 1-2.522-2.522V8.823a2.528 2.528 0 0 1 2.522-2.52h5.043zm10.123 2.52a2.528 2.528 0 0 1 2.522-2.52 2.528 2.528 0 0 1 2.52 2.52 2.528 2.528 0 0 1-2.52 2.522h-2.52v-2.522zm-1.261 0a2.528 2.528 0 0 1-2.522 2.52h-5.043a2.528 2.528 0 0 1-2.52-2.52V3.78a2.528 2.528 0 0 1 2.52-2.522h5.043a2.528 2.528 0 0 1 2.522 2.522v5.043zm-2.52 10.123a2.528 2.528 0 0 1 2.52 2.522a2.528 2.528 0 0 1-2.52 2.522 2.528 2.528 0 0 1-2.522-2.522v-2.522h2.522zm0-1.261a2.528 2.528 0 0 1-2.522-2.52v-5.043a2.528 2.528 0 0 1 2.522-2.52h5.043a2.528 2.528 0 0 1 2.52 2.52v5.043a2.528 2.528 0 0 1-2.52 2.52H15.18z" />
-    </svg>
-  );
 }
 
 export function PlatformCard({
@@ -245,11 +244,11 @@ export function PlatformCard({
     <Card>
       <CardHeader>
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {isSlack ? (
-              <SlackIcon className="h-5 w-5" />
+              <SlackIcon className="size-5" />
             ) : (
-              <HugeiconsIcon icon={icon} className="h-5 w-5" />
+              <HugeiconsIcon icon={icon} className="size-5" />
             )}
           </span>
           <div>
@@ -286,14 +285,11 @@ export function PlatformCard({
                 {!hasGlobalGoogleOauth ? (
                   <>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="client-id"
-                          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                        >
-                          <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
+                      <Field>
+                        <FieldLabel htmlFor="client-id">
+                          <HugeiconsIcon icon={Key01Icon} className="size-3.5" />
                           Google Client ID
-                        </label>
+                        </FieldLabel>
                         <Input
                           id="client-id"
                           placeholder="Enter Google Client ID (optional if env set)"
@@ -301,15 +297,12 @@ export function PlatformCard({
                           disabled={isDemo || connectGoogleOauth.isPending}
                           onChange={(e) => setChannelId(e.target.value)}
                         />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label
-                          htmlFor="client-secret"
-                          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                        >
-                          <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
+                      </Field>
+                      <Field>
+                        <FieldLabel htmlFor="client-secret">
+                          <HugeiconsIcon icon={Key01Icon} className="size-3.5" />
                           Google Client Secret
-                        </label>
+                        </FieldLabel>
                         <Input
                           id="client-secret"
                           type="password"
@@ -318,38 +311,10 @@ export function PlatformCard({
                           disabled={isDemo || connectGoogleOauth.isPending}
                           onChange={(e) => setBotToken(e.target.value)}
                         />
-                      </div>
+                      </Field>
                     </div>
 
-                    <div className="rounded-md border bg-muted/30 p-3">
-                      <p className="text-xs font-medium text-muted-foreground mb-1">
-                        Authorized Redirect URI:
-                      </p>
-                      <code className="text-[11px] block select-all break-all bg-background border px-2 py-1 rounded">
-                        {typeof window !== "undefined"
-                          ? `${window.location.origin}/api/auth/google/callback`
-                          : "http://localhost:3000/api/auth/google/callback"}
-                      </code>
-                      <div className="mt-3 text-[10px] text-muted-foreground space-y-1.5 border-t pt-2 border-border/50">
-                        <p className="font-medium text-foreground text-xs">
-                          How to configure Google Classroom:
-                        </p>
-                        <ul className="list-disc pl-4 space-y-1">
-                          <li>
-                            Go to Google Cloud Console, create a project, and enable the Google
-                            Classroom API.
-                          </li>
-                          <li>
-                            Configure your OAuth consent screen and add the Redirect URI above to
-                            your Authorized Redirect URIs.
-                          </li>
-                          <li>
-                            Create OAuth 2.0 Client ID credentials, then paste the Client ID and
-                            Secret here.
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
+                    <ClassroomHelp />
                   </>
                 ) : (
                   <p className="text-xs text-muted-foreground">
@@ -367,9 +332,7 @@ export function PlatformCard({
                   disabled={isDemo || disconnect.isPending}
                   onClick={() => disconnect.mutate()}
                 >
-                  {disconnect.isPending && (
-                    <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                  )}
+                  {disconnect.isPending && <Spinner />}
                   Disconnect
                 </Button>
               ) : (
@@ -377,9 +340,7 @@ export function PlatformCard({
                   disabled={isDemo || connectGoogleOauth.isPending}
                   onClick={() => connectGoogleOauth.mutate()}
                 >
-                  {connectGoogleOauth.isPending && (
-                    <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                  )}
+                  {connectGoogleOauth.isPending && <Spinner />}
                   Connect Google Classroom
                 </Button>
               )}
@@ -398,18 +359,15 @@ export function PlatformCard({
                 <div
                   className={cn("grid gap-3", type === "gemini" ? "grid-cols-1" : "sm:grid-cols-2")}
                 >
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="bot-token"
-                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                    >
-                      <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />
+                  <Field>
+                    <FieldLabel htmlFor="bot-token">
+                      <HugeiconsIcon icon={Key01Icon} className="size-3.5" />
                       {type === "gemini"
                         ? "Gemini API Key"
                         : isSlack
                           ? "Token (xoxc-...)"
                           : "User token"}
-                    </label>
+                    </FieldLabel>
                     <Input
                       id="bot-token"
                       type="password"
@@ -425,16 +383,12 @@ export function PlatformCard({
                       disabled={isDemo || connectBot.isPending}
                       onChange={(e) => setBotToken(e.target.value)}
                     />
-                  </div>
+                  </Field>
                   {isSlack && (
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="slack-cookie"
-                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-                      >
-                        <HugeiconsIcon icon={Key01Icon} className="h-3.5 w-3.5" />d cookie
-                        (xoxd-...)
-                      </label>
+                    <Field>
+                      <FieldLabel htmlFor="slack-cookie">
+                        <HugeiconsIcon icon={Key01Icon} className="size-3.5" />d cookie (xoxd-...)
+                      </FieldLabel>
                       <Input
                         id="slack-cookie"
                         type="password"
@@ -444,16 +398,16 @@ export function PlatformCard({
                         disabled={isDemo || connectBot.isPending}
                         onChange={(e) => setSlackCookie(e.target.value)}
                       />
-                    </div>
+                    </Field>
                   )}
                 </div>
 
                 {type !== "gemini" && (
-                  <div className="space-y-1.5">
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                      <HugeiconsIcon icon={HashIcon} className="h-3.5 w-3.5" />
+                  <Field>
+                    <FieldLabel render={<span />} nativeLabel={false}>
+                      <HugeiconsIcon icon={HashIcon} className="size-3.5" />
                       Channel IDs
-                    </label>
+                    </FieldLabel>
                     <div className="space-y-2">
                       {channelIds.map((cid, i) => (
                         <div key={i} className="flex items-center gap-2">
@@ -488,7 +442,7 @@ export function PlatformCard({
                       <HugeiconsIcon icon={Add01Icon} className="h-3.5 w-3.5" />
                       Add channel
                     </Button>
-                  </div>
+                  </Field>
                 )}
 
                 {type === "gemini" && (
@@ -506,45 +460,9 @@ export function PlatformCard({
                   </p>
                 )}
 
-                {type === "discord" && (
-                  <div className="rounded-md border bg-muted/20 p-3 text-[10px] text-muted-foreground space-y-1.5">
-                    <p className="font-medium text-foreground text-xs">How to configure Discord:</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li>
-                        <strong>User token:</strong> Open Discord in your web browser, press F12,
-                        inspect any API request under the Network tab, and copy the{" "}
-                        <code>authorization</code> header value. <em>Keep this token private!</em>
-                      </li>
-                      <li>
-                        <strong>Channel ID:</strong> Enable Developer Mode in Discord Settings &gt;
-                        Advanced, right-click the channel, and choose{" "}
-                        <strong>Copy Channel ID</strong>.
-                      </li>
-                    </ul>
-                  </div>
-                )}
+                {type === "discord" && <DiscordHelp />}
 
-                {type === "slack" && (
-                  <div className="rounded-md border bg-muted/20 p-3 text-[10px] text-muted-foreground space-y-1.5">
-                    <p className="font-medium text-foreground text-xs">How to configure Slack:</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                      <li>
-                        <strong>Token (xoxc-...):</strong> Open Slack in your web browser, press
-                        F12, inspect any request under the Network tab, and copy the token starting
-                        with <code>xoxc-</code> in the request payload or response.
-                      </li>
-                      <li>
-                        <strong>d cookie (xoxd-...):</strong> In browser Developer Tools, go to
-                        Application &gt; Cookies &gt; slack.com, and copy the value of the{" "}
-                        <code>d</code> cookie.
-                      </li>
-                      <li>
-                        <strong>Channel ID:</strong> Right-click the channel name in Slack, click
-                        &apos;View channel details&apos;, and copy the ID at the bottom.
-                      </li>
-                    </ul>
-                  </div>
-                )}
+                {type === "slack" && <SlackHelp />}
               </>
             )}
 
@@ -561,9 +479,7 @@ export function PlatformCard({
                     }
                     onClick={() => connectBot.mutate()}
                   >
-                    {connectBot.isPending && (
-                      <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                    )}
+                    {connectBot.isPending && <Spinner />}
                     Update channels
                   </Button>
                   <Button variant="outline" disabled={connectBot.isPending} onClick={cancelManage}>
@@ -586,9 +502,7 @@ export function PlatformCard({
                     disabled={isDemo || disconnect.isPending}
                     onClick={() => disconnect.mutate()}
                   >
-                    {disconnect.isPending && (
-                      <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                    )}
+                    {disconnect.isPending && <Spinner />}
                     Disconnect
                   </Button>
                 </>
@@ -603,9 +517,7 @@ export function PlatformCard({
                   }
                   onClick={() => connectBot.mutate()}
                 >
-                  {connectBot.isPending && (
-                    <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                  )}
+                  {connectBot.isPending && <Spinner />}
                   Connect
                 </Button>
               )}

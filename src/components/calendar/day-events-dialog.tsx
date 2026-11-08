@@ -44,7 +44,7 @@ export function DayEventsDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HugeiconsIcon icon={Calendar03Icon} className="h-4 w-4" />
+            <HugeiconsIcon icon={Calendar03Icon} className="size-4 text-primary" />
             {format(date, "EEEE, MMMM d")}
           </DialogTitle>
           <DialogDescription>
@@ -58,10 +58,10 @@ export function DayEventsDialog({
           <ul className="max-h-80 space-y-1 overflow-y-auto">
             {sorted.map((ev) => (
               <li key={ev.id}>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => onEdit(ev)}
-                  className="flex w-full items-start gap-3 rounded-md p-2 text-left transition-colors hover:bg-accent"
+                  className="h-auto w-full items-start justify-start gap-3 p-2 text-left whitespace-normal"
                 >
                   <span
                     className={cn(
@@ -73,17 +73,17 @@ export function DayEventsDialog({
                     {ev.end_time ? `–${formatTime(ev.end_time)}` : ""}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-2">
                       <EventBadge type={ev.event_type} />
                       <span className="truncate font-medium">{ev.title}</span>
-                    </div>
+                    </span>
                     {ev.description && (
-                      <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                      <span className="mt-0.5 line-clamp-2 block text-xs font-normal text-muted-foreground">
                         {ev.description}
-                      </div>
+                      </span>
                     )}
                   </span>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -91,7 +91,7 @@ export function DayEventsDialog({
 
         <DialogFooter>
           <Button onClick={onAdd} className="w-full sm:w-auto">
-            <HugeiconsIcon icon={PlusSignIcon} className="h-4 w-4" />
+            <HugeiconsIcon icon={PlusSignIcon} />
             Add event
           </Button>
         </DialogFooter>

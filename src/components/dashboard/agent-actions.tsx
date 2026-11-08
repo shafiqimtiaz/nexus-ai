@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Calendar03Icon, Link02Icon, RefreshIcon, SparklesIcon } from "@hugeicons/core-free-icons";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { DashboardCard } from "@/components/dashboard/dashboard-card";
+import { cn } from "@/lib/utils";
 import type { DashboardAgentAction } from "@/lib/dashboard";
 
 const BATCH_SIZE = 16;
@@ -42,62 +50,62 @@ export function AgentActions({
   }, [hasMore, items.length]);
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4 text-amber-500 animate-pulse" />
-          Agent Activity
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No autonomous actions logged yet. Synced updates will trigger concierge actions.
-          </p>
-        ) : (
-          <div
-            ref={scrollContainerRef}
-            className="max-h-80 min-h-0 overflow-y-auto scrollbar-none pr-1"
-          >
-            <ul className="divide-y divide-border">
-              {visible.map((item) => {
-                let icon = SparklesIcon;
-                let iconColor = "text-amber-500";
-                if (item.action_type === "calendar") {
-                  icon = Calendar03Icon;
-                  iconColor = "text-blue-500";
-                } else if (item.action_type === "resource") {
-                  icon = Link02Icon;
-                  iconColor = "text-emerald-500";
-                } else if (item.action_type === "sync") {
-                  icon = RefreshIcon;
-                  iconColor = "text-cyan-500";
-                }
+    <DashboardCard icon={SparklesIcon} title="Agent activity" className={className}>
+      {items.length === 0 ? (
+        <Empty className="p-4">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <HugeiconsIcon icon={SparklesIcon} />
+            </EmptyMedia>
+            <EmptyTitle className="text-base">Quiet for now</EmptyTitle>
+            <EmptyDescription>
+              When Nexus adds events or saves links on its own, you will see it here.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <div
+          ref={scrollContainerRef}
+          className="max-h-80 min-h-0 overflow-y-auto pr-1 scrollbar-none"
+        >
+          <ul className="divide-y divide-border">
+            {visible.map((item) => {
+              let icon = SparklesIcon;
+              let tone = "bg-highlight/20 text-amber-700 dark:text-amber-300";
+              if (item.action_type === "calendar") {
+                icon = Calendar03Icon;
+                tone = "bg-blue-500/12 text-blue-700 dark:text-blue-300";
+              } else if (item.action_type === "resource") {
+                icon = Link02Icon;
+                tone = "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
+              } else if (item.action_type === "sync") {
+                icon = RefreshIcon;
+                tone = "bg-sky-500/12 text-sky-700 dark:text-sky-300";
+              }
 
-                return (
-                  <li key={item.id} className="py-3 flex items-start gap-3 first:pt-0 last:pb-0">
-                    <div className={`mt-0.5 rounded-full bg-muted p-1.5 ${iconColor}`}>
-                      <HugeiconsIcon icon={icon} className="h-3.5 w-3.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-foreground block truncate">
-                        {item.title}
-                      </span>
-                      <p className="text-xs text-muted-foreground mt-0.5 break-words">
-                        {item.description}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground/60 mt-1 block">
-                        {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              return (
+                <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className={cn("mt-0.5 rounded-full p-1.5", tone)}>
+                    <HugeiconsIcon icon={icon} className="size-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-foreground">
+                      {item.title}
+                    </span>
+                    <p className="mt-0.5 text-xs break-words text-muted-foreground">
+                      {item.description}
+                    </p>
+                    <span className="mt-1 block text-[11px] text-muted-foreground/70">
+                      {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {hasMore && <div ref={sentinelRef} className="h-px" aria-hidden="true" />}
+        </div>
+      )}
+    </DashboardCard>
   );
 }

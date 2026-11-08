@@ -1,22 +1,21 @@
 import { getRole } from "@/lib/auth";
+import { PageHeader } from "@/components/layout/page-header";
 import { ChatInterface } from "@/components/chat/chat-interface";
 
 export const metadata = {
-  title: "AI Chat — Nexus",
+  title: "Ask Nexus — Nexus",
 };
 
 export default async function ChatPage() {
   const role = await getRole();
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-8rem)] max-w-3xl flex-col space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">AI Chat</h1>
-        <p className="text-sm text-muted-foreground">
-          Nexus can check your schedule, plan study sessions, and manage your coursework using its
-          tools.
-        </p>
-      </div>
+    <div className="mx-auto flex h-[calc(100dvh-8rem)] max-w-3xl flex-col gap-4">
+      <PageHeader
+        eyebrow="Study agent"
+        title="Ask Nexus"
+        description="Check your schedule, plan study sessions, and manage your coursework with tools Nexus can actually use."
+      />
 
       <div className="min-h-0 flex-1">
         <ChatInterface role={role} expanded autoFocus />

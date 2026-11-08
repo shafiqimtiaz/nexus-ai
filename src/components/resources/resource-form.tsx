@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Tick02Icon, Loading03Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
+import { PlusSignIcon } from "@hugeicons/core-free-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -14,12 +14,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { labelTone } from "@/components/resources/label-tone";
 import type { Label, Resource } from "@/components/resources/resources-view";
 import { cn, formatUrl } from "@/lib/utils";
-
-const inputClass =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function ResourceForm({
   open,
@@ -43,14 +45,6 @@ export function ResourceForm({
     () => new Set(resource?.labels.map((l) => l.id) ?? [])
   );
   const [newLabel, setNewLabel] = useState("");
-
-  const toggleLabel = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
 
   const createLabel = useMutation({
     mutationFn: async (name: string) => {
@@ -110,19 +104,17 @@ export function ResourceForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit resource" : "Add resource"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit resource" : "Add to library"}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update this link and its labels."
-              : "Save a link with a title and optional labels."}
+              : "Save a link with a title, a note, and labels so you can find it later."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label htmlFor="resource-title" className="text-xs font-medium">
-              Title
-            </label>
+        <FieldGroup className="gap-3">
+          <Field>
+            <FieldLabel htmlFor="resource-title">Title</FieldLabel>
             <Input
               id="resource-title"
               value={title}
@@ -130,12 +122,10 @@ export function ResourceForm({
               placeholder="Course syllabus"
               onChange={(e) => setTitle(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label htmlFor="resource-url" className="text-xs font-medium">
-              URL
-            </label>
+          <Field>
+            <FieldLabel htmlFor="resource-url">URL</FieldLabel>
             <Input
               id="resource-url"
               type="url"
@@ -144,59 +134,51 @@ export function ResourceForm({
               placeholder="https://…"
               onChange={(e) => setUrl(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label htmlFor="resource-description" className="text-xs font-medium">
-              Description (optional)
-            </label>
-            <textarea
+          <Field>
+            <FieldLabel htmlFor="resource-description">Note (optional)</FieldLabel>
+            <Textarea
               id="resource-description"
               value={description}
               disabled={busy}
               rows={3}
               placeholder="What is this and why keep it…"
               onChange={(e) => setDescription(e.target.value)}
-              className={cn(inputClass, "h-auto py-1.5")}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <span className="text-xs font-medium">Labels</span>
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-foreground/80">Labels</span>
             {labels.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {labels.map((label) => {
-                  const active = selected.has(label.id);
-                  return (
-                    <button
-                      key={label.id}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => toggleLabel(label.id)}
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                        active
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {active && <HugeiconsIcon icon={Tick02Icon} className="h-3 w-3" />}
-                      {!active && label.color && (
-                        <span
-                          className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: label.color }}
-                        />
-                      )}
-                      {label.name}
-                    </button>
-                  );
-                })}
-              </div>
+              <ToggleGroup
+                multiple
+                spacing={1}
+                aria-label="Labels"
+                className="w-full flex-wrap"
+                value={Array.from(selected)}
+                disabled={busy}
+                onValueChange={(value) => setSelected(new Set(value))}
+              >
+                {labels.map((label) => (
+                  <ToggleGroupItem
+                    key={label.id}
+                    value={label.id}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full data-pressed:border-primary data-pressed:bg-primary data-pressed:text-primary-foreground"
+                  >
+                    <span className={cn("size-2 rounded-full", labelTone(label.color).dot)} />
+                    {label.name}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
             )}
 
             <div className="flex gap-2 pt-1">
               <Input
                 value={newLabel}
+                aria-label="New label"
                 disabled={busy || createLabel.isPending}
                 placeholder="New label…"
                 onChange={(e) => setNewLabel(e.target.value)}
@@ -210,30 +192,23 @@ export function ResourceForm({
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 disabled={busy || createLabel.isPending || !newLabel.trim()}
                 onClick={submitNewLabel}
               >
-                {createLabel.isPending ? (
-                  <HugeiconsIcon icon={Loading03Icon} className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <HugeiconsIcon icon={PlusSignIcon} className="h-3.5 w-3.5" />
-                )}
+                {createLabel.isPending ? <Spinner /> : <HugeiconsIcon icon={PlusSignIcon} />}
                 Add
               </Button>
             </div>
           </div>
-        </div>
+        </FieldGroup>
 
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button disabled={busy || !canSave} onClick={() => save.mutate()}>
-            {save.isPending && (
-              <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-            )}
-            {isEdit ? "Save" : "Add"}
+            {save.isPending && <Spinner />}
+            {isEdit ? "Save changes" : "Add to library"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -2,6 +2,7 @@
 
 import { useHydrated } from "@/lib/use-hydrated";
 import { format, isToday, isTomorrow } from "date-fns";
+import { PageHeader } from "@/components/layout/page-header";
 import type { DashboardEvent } from "@/lib/dashboard";
 
 function greetingFor(hour: number) {
@@ -38,16 +39,10 @@ export function DashboardGreeting({
   const now = useHydrated() ? new Date() : null;
 
   return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wider text-primary">
-        {now ? format(now, "EEEE, MMMM d") : " "}
-      </p>
-      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-        {now ? greetingFor(now.getHours()) : "Welcome back"}
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        {now ? summarize(todaysSchedule, upcomingEvents) : " "}
-      </p>
-    </div>
+    <PageHeader
+      eyebrow={now ? format(now, "EEEE, MMMM d") : "\u00a0"}
+      title={now ? greetingFor(now.getHours()) : "Welcome back"}
+      description={now ? summarize(todaysSchedule, upcomingEvents) : "\u00a0"}
+    />
   );
 }

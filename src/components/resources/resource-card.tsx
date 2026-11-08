@@ -1,9 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ExternalLinkIcon,
-  Loading03Icon,
   PencilEdit02Icon,
   PinIcon,
   Delete02Icon,
@@ -11,27 +11,27 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { Toggle } from "@/components/ui/toggle";
+import { labelTone } from "@/components/resources/label-tone";
 import type { Label, Resource } from "@/components/resources/resources-view";
 import { cn, formatUrl } from "@/lib/utils";
 
-function labelStyle(color: string | null) {
-  if (!color) return undefined;
-  return { backgroundColor: `${color}22`, color };
-}
-
 function LabelBadge({ label }: { label: Label }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-        !label.color && "bg-muted text-muted-foreground"
-      )}
-      style={labelStyle(label.color)}
-    >
-      {label.name}
-    </span>
-  );
+  return <Badge className={cn("font-medium", labelTone(label.color).chip)}>{label.name}</Badge>;
 }
 
 function hostname(url: string) {
@@ -52,6 +52,7 @@ export function ResourceCard({
   onEdit: () => void;
 }) {
   const queryClient = useQueryClient();
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["resources"] });
@@ -95,7 +96,7 @@ export function ResourceCard({
   const busy = togglePin.isPending || remove.isPending;
 
   return (
-    <Card className="flex h-full flex-col">
+    <Card className="flex h-full flex-col transition-shadow hover:shadow-md">
       <CardHeader className="grid-cols-[1fr_auto] items-start gap-2">
         <CardTitle className="min-w-0 text-base leading-snug">
           <a
@@ -112,19 +113,16 @@ export function ResourceCard({
           </span>
         </CardTitle>
         {canEdit && (
-          <Button
-            variant={resource.is_pinned ? "secondary" : "ghost"}
-            size="icon-sm"
+          <Toggle
+            size="sm"
+            pressed={resource.is_pinned}
             disabled={busy}
             aria-label={resource.is_pinned ? "Unpin resource" : "Pin resource"}
-            aria-pressed={resource.is_pinned}
-            onClick={() => togglePin.mutate()}
+            onPressedChange={() => togglePin.mutate()}
+            className="size-8 data-pressed:bg-highlight/20 data-pressed:text-amber-700 dark:data-pressed:text-amber-300"
           >
-            <HugeiconsIcon
-              icon={PinIcon}
-              className={cn("h-4 w-4", resource.is_pinned && "fill-current")}
-            />
-          </Button>
+            <HugeiconsIcon icon={PinIcon} className={cn(resource.is_pinned && "fill-current")} />
+          </Toggle>
         )}
       </CardHeader>
 
@@ -152,21 +150,45 @@ export function ResourceCard({
             >
               <HugeiconsIcon icon={PencilEdit02Icon} className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              disabled={busy}
-              aria-label="Delete resource"
-              onClick={() => {
-                if (window.confirm(`Delete "${resource.title}"?`)) remove.mutate();
-              }}
-            >
-              {remove.isPending ? (
-                <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-              ) : (
-                <HugeiconsIcon icon={Delete02Icon} className="h-4 w-4 text-destructive" />
-              )}
-            </Button>
+            <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+              <AlertDialogTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={busy}
+                    aria-label="Delete resource"
+                  />
+                }
+              >
+                {remove.isPending ? (
+                  <Spinner />
+                ) : (
+                  <HugeiconsIcon icon={Delete02Icon} className="text-destructive" />
+                )}
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this resource?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    &ldquo;{resource.title}&rdquo; will be removed from your library and from the
+                    dashboard if it is pinned. This can&apos;t be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep it</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => {
+                      setConfirmOpen(false);
+                      remove.mutate();
+                    }}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         )}
       </CardContent>

@@ -3,7 +3,13 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { CalendarClockIcon } from "@hugeicons/core-free-icons";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { EventBadge } from "@/components/dashboard/event-badge";
 import { PlatformPill } from "@/components/dashboard/platform-pill";
 import type { DashboardEvent } from "@/lib/dashboard";
@@ -23,7 +29,7 @@ function ExamRow({ event }: { event: DashboardEvent }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <EventBadge type={event.event_type} />
-          <span className="text-xs font-medium text-primary">
+          <span className="text-xs font-semibold text-primary">
             {formatDistanceToNow(start, { addSuffix: true })}
           </span>
         </div>
@@ -69,9 +75,10 @@ export function ExamsModal({
       <DialogContent className="sm:max-w-2xl !duration-0 data-open:animate-none data-closed:animate-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <HugeiconsIcon icon={CalendarClockIcon} className="h-5 w-5 text-primary" />
-            Upcoming exams &amp; quizzes
+            <HugeiconsIcon icon={CalendarClockIcon} className="size-5 text-primary" />
+            Exams and quizzes ahead
           </DialogTitle>
+          <DialogDescription>Plan your revision around these.</DialogDescription>
         </DialogHeader>
 
         {exams.length === 0 ? (

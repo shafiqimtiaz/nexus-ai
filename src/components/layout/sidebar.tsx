@@ -2,41 +2,75 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  DashboardSquare01Icon,
-  Calendar03Icon,
-  BookOpen01Icon,
-  AiChat02Icon,
-  Settings01Icon,
-  ArrowLeftDoubleIcon,
-  ArrowRightDoubleIcon,
-} from "@hugeicons/core-free-icons";
+import { AiMagicIcon, SidebarLeftIcon, SidebarRightIcon } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/", label: "Dashboard", icon: DashboardSquare01Icon },
-  { href: "/calendar", label: "Calendar", icon: Calendar03Icon },
-  { href: "/resources", label: "Resources", icon: BookOpen01Icon },
-  { href: "/chat", label: "AI Chat", icon: AiChat02Icon },
-  { href: "/options", label: "Options", icon: Settings01Icon },
-];
+import { openChat } from "@/lib/chat-events";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Brand } from "@/components/layout/brand";
+import { NAV_ITEMS, isActive } from "@/components/layout/nav-items";
 
 const COLLAPSED_STORAGE = "nexus_sidebar_collapsed";
+
+export function NavLinks({
+  collapsed = false,
+  onNavigate,
+}: {
+  collapsed?: boolean;
+  onNavigate?: () => void;
+}) {
+  const pathname = usePathname();
+
+  return (
+    <nav aria-label="Primary" className="flex flex-col gap-1">
+      {NAV_ITEMS.map(({ href, label, icon }) => {
+        const active = isActive(pathname, href);
+        const link = (
+          <Link
+            href={href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            aria-label={collapsed ? label : undefined}
+            className={cn(
+              "group/nav relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+              collapsed && "justify-center px-0",
+              active
+                ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:bg-sidebar-primary"
+                : "text-sidebar-foreground/65 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+            )}
+          >
+            <HugeiconsIcon
+              icon={icon}
+              className={cn("size-[18px] shrink-0", active && "text-sidebar-primary")}
+            />
+            {!collapsed && <span className="truncate">{label}</span>}
+          </Link>
+        );
+        if (!collapsed) return <div key={href}>{link}</div>;
+        return (
+          <Tooltip key={href}>
+            <TooltipTrigger render={link} />
+            <TooltipContent side="right">{label}</TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </nav>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    const mql = window.matchMedia("(max-width: 768px)");
-    const sync = () =>
-      setCollapsed(mql.matches || localStorage.getItem(COLLAPSED_STORAGE) === "true");
-    sync();
-    mql.addEventListener("change", sync);
-    return () => mql.removeEventListener("change", sync);
+    const id = requestAnimationFrame(() =>
+      setCollapsed(localStorage.getItem(COLLAPSED_STORAGE) === "true")
+    );
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const toggle = () =>
@@ -50,75 +84,58 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex h-full shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-in-out",
-        collapsed ? "w-16" : "w-60"
+        "hidden h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-300 ease-in-out md:flex",
+        collapsed ? "w-[72px]" : "w-64"
       )}
     >
-      {/* Brand */}
       <div
-        className={cn(
-          "flex h-16 items-center border-b px-4",
-          collapsed ? "justify-center" : "justify-between"
-        )}
+        className={cn("flex h-16 shrink-0 items-center px-5", collapsed && "justify-center px-0")}
       >
+        <Link
+          href="/"
+          aria-label="Nexus home"
+          className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        >
+          <Brand showWordmark={!collapsed} onDark />
+        </Link>
+      </div>
+
+      <div className={cn("flex-1 px-3 pt-2", collapsed && "px-3")}>
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Image
-              src="/nexus-icon.png"
-              alt="Nexus"
-              width={32}
-              height={32}
-              className="h-8 w-8 shrink-0"
-              priority
-            />
-            <span className="flex items-center gap-1 whitespace-nowrap overflow-hidden">
-              <span className="text-xl font-semibold tracking-tight">Nexus</span>
-              <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary">
-                ai
-              </span>
-            </span>
-          </div>
+          <p className="mb-2 px-3 text-[10px] font-semibold tracking-[0.18em] text-sidebar-foreground/40 uppercase">
+            Workspace
+          </p>
         )}
-        <button
+        <NavLinks collapsed={collapsed} />
+      </div>
+
+      <div className="space-y-3 p-3">
+        <Separator className="bg-sidebar-border" />
+        {!collapsed && (
+          <Button
+            variant="ghost"
+            onClick={() => openChat()}
+            className="h-10 w-full justify-start gap-2.5 bg-sidebar-accent/70 px-3 text-sidebar-accent-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <HugeiconsIcon icon={AiMagicIcon} className="text-sidebar-primary" />
+            Quick ask
+            <Kbd className="ml-auto bg-sidebar-border text-sidebar-foreground/70">⌘K</Kbd>
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size={collapsed ? "icon-lg" : "sm"}
           onClick={toggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors",
-            collapsed && "flex h-8 w-8 items-center justify-center p-0"
+            "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            collapsed ? "mx-auto flex" : "w-full justify-start gap-2.5 px-3"
           )}
         >
-          {collapsed ? (
-            <HugeiconsIcon icon={ArrowRightDoubleIcon} className="h-4 w-4 shrink-0" />
-          ) : (
-            <HugeiconsIcon icon={ArrowLeftDoubleIcon} className="h-4 w-4 shrink-0" />
-          )}
-        </button>
+          <HugeiconsIcon icon={collapsed ? SidebarRightIcon : SidebarLeftIcon} />
+          {!collapsed && "Collapse"}
+        </Button>
       </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-2">
-        {navItems.map(({ href, label, icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              title={collapsed ? label : undefined}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                collapsed && "justify-center px-0",
-                active
-                  ? "bg-primary/10 text-primary before:absolute before:inset-y-2 before:-left-2 before:w-1 before:rounded-r-full before:bg-primary"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-              )}
-            >
-              <HugeiconsIcon icon={icon} className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="whitespace-nowrap overflow-hidden">{label}</span>}
-            </Link>
-          );
-        })}
-      </nav>
     </aside>
   );
 }

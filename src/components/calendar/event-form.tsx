@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Loading03Icon, Delete02Icon } from "@hugeicons/core-free-icons";
+import { Delete02Icon } from "@hugeicons/core-free-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -15,7 +15,18 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { EVENT_META } from "@/components/dashboard/event-badge";
 import type { EventType } from "@/lib/dashboard";
 import type { CalendarEvent } from "@/components/calendar/calendar-view";
 import { cn } from "@/lib/utils";
@@ -44,9 +55,6 @@ function defaultStart(date: Date): string {
   d.setHours(9, 0, 0, 0);
   return format(d, INPUT_FORMAT);
 }
-
-const inputClass =
-  "h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function EventForm({
   open,
@@ -123,7 +131,7 @@ export function EventForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit event" : "New event"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit event" : "Add event"}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Update the details for this event."
@@ -131,11 +139,9 @@ export function EventForm({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label htmlFor="event-title" className="text-xs font-medium">
-              Title
-            </label>
+        <FieldGroup className="gap-3">
+          <Field>
+            <FieldLabel htmlFor="event-title">Title</FieldLabel>
             <Input
               id="event-title"
               value={title}
@@ -143,35 +149,33 @@ export function EventForm({
               placeholder="Midterm exam"
               onChange={(e) => setTitle(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label htmlFor="event-type" className="text-xs font-medium">
-              Type
-            </label>
-            <select
-              id="event-type"
+          <Field>
+            <FieldLabel>Type</FieldLabel>
+            <Select
+              items={TYPE_OPTIONS}
               value={eventType}
               disabled={busy}
-              onChange={(e) => setEventType(e.target.value as EventType)}
-              className={cn(
-                inputClass,
-                "bg-background text-foreground [&>option]:bg-background [&>option]:text-foreground"
-              )}
+              onValueChange={(v) => v && setEventType(v as EventType)}
             >
-              {TYPE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
+              <SelectTrigger id="event-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TYPE_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    <span className={cn("size-2 rounded-full", EVENT_META[o.value].dot)} />
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor="event-start" className="text-xs font-medium">
-                Starts
-              </label>
+            <Field>
+              <FieldLabel htmlFor="event-start">Starts</FieldLabel>
               <Input
                 id="event-start"
                 type="datetime-local"
@@ -179,11 +183,9 @@ export function EventForm({
                 disabled={busy}
                 onChange={(e) => setStart(e.target.value)}
               />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="event-end" className="text-xs font-medium">
-                Ends (optional)
-              </label>
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="event-end">Ends (optional)</FieldLabel>
               <Input
                 id="event-end"
                 type="datetime-local"
@@ -191,33 +193,26 @@ export function EventForm({
                 disabled={busy}
                 onChange={(e) => setEnd(e.target.value)}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="space-y-1.5">
-            <label htmlFor="event-description" className="text-xs font-medium">
-              Description (optional)
-            </label>
-            <textarea
+          <Field>
+            <FieldLabel htmlFor="event-description">Notes (optional)</FieldLabel>
+            <Textarea
               id="event-description"
               value={description}
               disabled={busy}
               rows={3}
-              placeholder="Notes, location, chapters to review…"
+              placeholder="Location, chapters to review, what to bring…"
               onChange={(e) => setDescription(e.target.value)}
-              className={cn(inputClass, "h-auto py-1.5")}
             />
-          </div>
-        </div>
+          </Field>
+        </FieldGroup>
 
         <DialogFooter className="sm:justify-between">
           {isEdit ? (
             <Button variant="destructive" disabled={busy} onClick={() => remove.mutate()}>
-              {remove.isPending ? (
-                <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-              ) : (
-                <HugeiconsIcon icon={Delete02Icon} className="h-4 w-4" />
-              )}
+              {remove.isPending ? <Spinner /> : <HugeiconsIcon icon={Delete02Icon} />}
               Delete
             </Button>
           ) : (
@@ -228,10 +223,8 @@ export function EventForm({
               Cancel
             </Button>
             <Button disabled={busy || !canSave} onClick={() => save.mutate()}>
-              {save.isPending && (
-                <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-              )}
-              {isEdit ? "Save" : "Create"}
+              {save.isPending && <Spinner />}
+              {isEdit ? "Save changes" : "Add to calendar"}
             </Button>
           </div>
         </DialogFooter>

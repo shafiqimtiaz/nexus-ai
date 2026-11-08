@@ -2,7 +2,7 @@ import { getRole } from "@/lib/auth";
 import { ResourcesView } from "@/components/resources/resources-view";
 
 export const metadata = {
-  title: "Resources — Nexus",
+  title: "Library — Nexus",
 };
 
 export default async function ResourcesPage() {

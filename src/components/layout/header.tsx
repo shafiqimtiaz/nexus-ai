@@ -2,17 +2,64 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Logout01Icon, Sun03Icon, Moon02Icon, AiMagicIcon } from "@hugeicons/core-free-icons";
-import { openChat } from "@/lib/chat-events";
-import { Button } from "@/components/ui/button";
-import type { Role } from "@/lib/auth";
 import { useTheme } from "next-themes";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  AiMagicIcon,
+  ComputerIcon,
+  Logout01Icon,
+  Moon02Icon,
+  Sun03Icon,
+} from "@hugeicons/core-free-icons";
+import { openChat } from "@/lib/chat-events";
+import type { Role } from "@/lib/auth";
 import { useHydrated } from "@/lib/use-hydrated";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Kbd } from "@/components/ui/kbd";
+import { Brand } from "@/components/layout/brand";
+import { MobileNav } from "@/components/layout/mobile-nav";
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Light", icon: Sun03Icon },
+  { value: "dark", label: "Dark", icon: Moon02Icon },
+  { value: "system", label: "System", icon: ComputerIcon },
+];
+
+function ThemeMenu() {
+  const { theme = "system", setTheme, resolvedTheme } = useTheme();
+  const mounted = useHydrated();
+  if (!mounted) return <span className="size-9" />;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button variant="ghost" size="icon-lg" aria-label="Change theme" />}
+      >
+        <HugeiconsIcon icon={resolvedTheme === "dark" ? Moon02Icon : Sun03Icon} />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+          {THEME_OPTIONS.map(({ value, label, icon }) => (
+            <DropdownMenuRadioItem key={value} value={value}>
+              <HugeiconsIcon icon={icon} />
+              {label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Header({ role }: { role: Role }) {
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const mounted = useHydrated();
   const pathname = usePathname();
 
   async function handleLogout() {
@@ -20,65 +67,47 @@ export function Header({ role }: { role: Role }) {
     window.location.reload();
   }
 
-  const currentTheme = theme === "system" ? resolvedTheme : theme;
-
   if (pathname?.startsWith("/login")) return null;
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur sm:px-6">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-background/80 px-3 backdrop-blur sm:px-6">
+      <MobileNav />
+      <Brand className="md:hidden" />
+
       {!pathname?.startsWith("/chat") && (
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={() => openChat()}
-          className="hidden h-9 w-full max-w-xs cursor-pointer items-center gap-2 rounded-lg border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted md:flex"
+          className="hidden h-9 w-full max-w-sm justify-start gap-2 bg-card font-normal text-muted-foreground md:inline-flex"
         >
-          <HugeiconsIcon icon={AiMagicIcon} className="h-4 w-4 text-primary" />
+          <HugeiconsIcon icon={AiMagicIcon} className="text-primary" />
           Ask Nexus anything…
-          <kbd className="ml-auto rounded border bg-background px-1.5 font-mono text-[10px]">
-            ⌘K
-          </kbd>
-        </button>
+          <Kbd className="ml-auto">⌘K</Kbd>
+        </Button>
       )}
-      {role === "demo" ? (
-        <div className="flex min-w-0 items-center gap-2 text-sm">
-          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-            Demo mode
-          </span>
-          <span className="whitespace-nowrap text-muted-foreground">
-            <span className="hidden lg:inline">Read-only. </span>
-            <Link href="/login" className="font-medium text-primary hover:underline">
+
+      <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+        {role === "demo" ? (
+          <>
+            <Badge variant="secondary" className="hidden h-6 sm:inline-flex">
+              Demo mode · read-only
+            </Badge>
+            <Button
+              variant="default"
+              size="lg"
+              render={<Link href="/login" />}
+              nativeButton={false}
+            >
               Log in
-            </Link>
-            <span className="hidden lg:inline"> for full access.</span>
-          </span>
-        </div>
-      ) : (
-        <span className="md:hidden" />
-      )}
-
-      <div className="ml-auto flex items-center gap-3">
-        {mounted && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(currentTheme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
-            className="h-9 w-9 rounded-md"
-          >
-            {currentTheme === "dark" ? (
-              <HugeiconsIcon icon={Sun03Icon} className="h-4 w-4 text-amber-500 transition-all" />
-            ) : (
-              <HugeiconsIcon icon={Moon02Icon} className="h-4 w-4 text-slate-700 transition-all" />
-            )}
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" size="lg" onClick={handleLogout}>
+            <HugeiconsIcon icon={Logout01Icon} />
+            <span className="hidden sm:inline">Log out</span>
           </Button>
         )}
-
-        {role === "owner" && (
-          <Button variant="outline" size="sm" onClick={handleLogout}>
-            <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4" />
-            Log out
-          </Button>
-        )}
+        <ThemeMenu />
       </div>
     </header>
   );
