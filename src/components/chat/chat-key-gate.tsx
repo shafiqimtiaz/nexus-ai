@@ -19,7 +19,7 @@ export function DemoKeyForm({ onSave }: { onSave: (key: string) => void }) {
   const [value, setValue] = useState("");
 
   return (
-    <Empty className="border bg-card">
+    <Empty className="min-h-0 overflow-y-auto border bg-card">
       <EmptyHeader className="max-w-md">
         <EmptyMedia variant="icon">
           <HugeiconsIcon icon={Key01Icon} />
@@ -66,7 +66,7 @@ export function DemoKeyForm({ onSave }: { onSave: (key: string) => void }) {
 
 export function MissingKeyNotice() {
   return (
-    <Empty className="border bg-card">
+    <Empty className="min-h-0 overflow-y-auto border bg-card">
       <EmptyHeader className="max-w-md">
         <EmptyMedia variant="icon" className="bg-destructive/10 text-destructive">
           <HugeiconsIcon icon={Key01Icon} />

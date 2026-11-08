@@ -10,7 +10,7 @@ export function AnnouncementMeta({ item }: { item: DashboardAnnouncement }) {
         <Badge className="bg-primary/10 text-primary dark:bg-primary/15">{item.author}</Badge>
       )}
       {item.announced_at && (
-        <Badge variant="secondary">
+        <Badge variant="secondary" suppressHydrationWarning>
           {formatDistanceToNow(new Date(item.announced_at), { addSuffix: true })}
         </Badge>
       )}

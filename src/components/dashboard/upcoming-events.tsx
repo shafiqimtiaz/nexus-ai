@@ -57,7 +57,10 @@ export function UpcomingEvents({
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-right text-sm font-semibold text-primary">
+                      <span
+                        className="text-right text-sm font-semibold text-primary"
+                        suppressHydrationWarning
+                      >
                         {formatDistanceToNow(start, { addSuffix: true })}
                       </span>
                       <HugeiconsIcon

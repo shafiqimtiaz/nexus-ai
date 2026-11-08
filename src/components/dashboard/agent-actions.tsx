@@ -95,7 +95,10 @@ export function AgentActions({
                     <p className="mt-0.5 text-xs break-words text-muted-foreground">
                       {item.description}
                     </p>
-                    <span className="mt-1 block text-[11px] text-muted-foreground/70">
+                    <span
+                      className="mt-1 block text-[11px] text-muted-foreground/70"
+                      suppressHydrationWarning
+                    >
                       {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
                     </span>
                   </div>
