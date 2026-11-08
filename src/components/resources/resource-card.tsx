@@ -34,6 +34,14 @@ function LabelBadge({ label }: { label: Label }) {
   );
 }
 
+function hostname(url: string) {
+  try {
+    return new URL(formatUrl(url)).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 export function ResourceCard({
   resource,
   canEdit,
@@ -88,7 +96,7 @@ export function ResourceCard({
 
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="flex-row items-start justify-between gap-2 space-y-0">
+      <CardHeader className="grid-cols-[1fr_auto] items-start gap-2">
         <CardTitle className="min-w-0 text-base leading-snug">
           <a
             href={formatUrl(resource.url)}
@@ -99,6 +107,9 @@ export function ResourceCard({
             <span className="line-clamp-2">{resource.title}</span>
             <HugeiconsIcon icon={ExternalLinkIcon} className="h-3.5 w-3.5 shrink-0" />
           </a>
+          <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+            {hostname(resource.url)}
+          </span>
         </CardTitle>
         {canEdit && (
           <Button
@@ -146,7 +157,9 @@ export function ResourceCard({
               size="icon-sm"
               disabled={busy}
               aria-label="Delete resource"
-              onClick={() => remove.mutate()}
+              onClick={() => {
+                if (window.confirm(`Delete "${resource.title}"?`)) remove.mutate();
+              }}
             >
               {remove.isPending ? (
                 <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />

@@ -5,7 +5,6 @@ import { formatDistanceToNow } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Calendar03Icon, Link02Icon, RefreshIcon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import type { DashboardAgentAction } from "@/lib/dashboard";
 
 const BATCH_SIZE = 16;
@@ -43,7 +42,7 @@ export function AgentActions({
   }, [hasMore, items.length]);
 
   return (
-    <Card className={cn("self-start", className)}>
+    <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4 text-amber-500 animate-pulse" />

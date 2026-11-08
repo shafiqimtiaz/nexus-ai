@@ -17,12 +17,14 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("announcements")
-    .select("id, title, content, ai_summary, author, source_url, announced_at, platform_id")
+    .select(
+      "id, title, content, ai_summary, author, source_url, announced_at, platform_id, is_read"
+    )
     .order("announced_at", { ascending: false });
 
   if (platform) {
     const { data: platforms } = await db.from("platforms").select("id").eq("type", platform);
-    const platformIds = (platforms ?? []).map((p: any) => p.id as string);
+    const platformIds = (platforms ?? []).map((p) => p.id as string);
     if (platformIds.length > 0) {
       query = query.in("platform_id", platformIds);
     } else {
@@ -40,7 +42,9 @@ export async function GET(request: NextRequest) {
   if (!allData && error) {
     const fallback = db
       .from("announcements")
-      .select("id, title, content, ai_summary, author, source_url, announced_at, platform_id")
+      .select(
+        "id, title, content, ai_summary, author, source_url, announced_at, platform_id, is_read"
+      )
       .order("announced_at", { ascending: false });
     const fbResult = await fallback;
     allData = fbResult.data;
@@ -51,12 +55,12 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  let items = (allData ?? []) as any[];
+  let items = allData ?? [];
 
   // client-side filter for platforms (mock-db has chaining limitations)
   if (platform) {
     const { data: platforms } = await db.from("platforms").select("id").eq("type", platform);
-    const platformIds = new Set((platforms ?? []).map((p: any) => p.id as string));
+    const platformIds = new Set((platforms ?? []).map((p) => p.id as string));
     items = items.filter((item) => platformIds.has(item.platform_id));
   }
 
@@ -68,16 +72,16 @@ export async function GET(request: NextRequest) {
   const offset = page * pageSize;
   const paged = items.slice(offset, offset + pageSize);
 
-  const allPlatformIds = [...new Set(paged.map((a: any) => a.platform_id).filter(Boolean))];
+  const allPlatformIds = [...new Set(paged.map((a) => a.platform_id).filter(Boolean))];
   const { data: platformData } =
     allPlatformIds.length > 0
       ? await db.from("platforms").select("id, name, type").in("id", allPlatformIds)
       : { data: [] };
   const platformMap = new Map<string, { name: string | null; type: string | null }>(
-    (platformData ?? []).map((p: any) => [p.id, { name: p.name, type: p.type }])
+    (platformData ?? []).map((p) => [p.id, { name: p.name, type: p.type }])
   );
 
-  const result = paged.map((item: any) => {
+  const result = paged.map((item) => {
     const plat = item.platform_id ? platformMap.get(item.platform_id) : null;
     return {
       id: item.id,

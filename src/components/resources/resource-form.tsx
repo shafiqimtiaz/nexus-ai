@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon, Loading03Icon, PlusSignIcon } from "@hugeicons/core-free-icons";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,27 +35,14 @@ export function ResourceForm({
   const queryClient = useQueryClient();
   const isEdit = resource !== null;
 
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Mounted fresh (keyed) each time the dialog opens, so initial state comes straight from props.
+  const [title, setTitle] = useState(resource?.title ?? "");
+  const [url, setUrl] = useState(resource?.url ?? "");
+  const [description, setDescription] = useState(resource?.description ?? "");
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(resource?.labels.map((l) => l.id) ?? [])
+  );
   const [newLabel, setNewLabel] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    if (resource) {
-      setTitle(resource.title);
-      setUrl(resource.url);
-      setDescription(resource.description ?? "");
-      setSelected(new Set(resource.labels.map((l) => l.id)));
-    } else {
-      setTitle("");
-      setUrl("");
-      setDescription("");
-      setSelected(new Set());
-    }
-    setNewLabel("");
-  }, [open, resource]);
 
   const toggleLabel = (id: string) =>
     setSelected((prev) => {

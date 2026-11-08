@@ -17,7 +17,7 @@ import { ArrowLeft01Icon, ArrowRight01Icon, PlusSignIcon } from "@hugeicons/core
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EventBadge } from "@/components/dashboard/event-badge";
+import { EventBadge, EVENT_META } from "@/components/dashboard/event-badge";
 import { EventForm } from "@/components/calendar/event-form";
 import { DayEventsDialog } from "@/components/calendar/day-events-dialog";
 import type { EventType } from "@/lib/dashboard";
@@ -36,14 +36,6 @@ export type CalendarEvent = {
   is_auto_detected: boolean;
   created_at: string;
   status?: "confirmed" | "cancelled";
-};
-
-const PILL_CLASS: Record<EventType, string> = {
-  exam: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",
-  quiz: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
-  assignment: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400",
-  study_block: "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",
-  other: "bg-muted text-muted-foreground",
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -161,6 +153,17 @@ export function CalendarView({ role }: { role: Role }) {
               </div>
             </CardHeader>
             <CardContent>
+              <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1">
+                {Object.entries(EVENT_META).map(([type, meta]) => (
+                  <span
+                    key={type}
+                    className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
+                  >
+                    <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
+                    {meta.label}
+                  </span>
+                ))}
+              </div>
               <div className="grid grid-cols-7 border-b text-center text-xs font-medium text-muted-foreground">
                 {WEEKDAYS.map((d) => (
                   <div key={d} className="pb-2">
@@ -217,7 +220,7 @@ export function CalendarView({ role }: { role: Role }) {
                             title={ev.title}
                             className={cn(
                               "block w-full truncate rounded px-1.5 py-0.5 text-left text-xs",
-                              PILL_CLASS[ev.event_type] ?? PILL_CLASS.other,
+                              (EVENT_META[ev.event_type] ?? EVENT_META.other).className,
                               ev.status === "cancelled" && "line-through opacity-50",
                               canEdit && "cursor-pointer"
                             )}
@@ -300,6 +303,7 @@ export function CalendarView({ role }: { role: Role }) {
 
       {canEdit && dialog && dialog.mode !== "day" && (
         <EventForm
+          key={dialog.mode === "edit" ? dialog.event.id : `create-${dialog.date.toISOString()}`}
           open
           onOpenChange={(open) => {
             if (!open) setDialog(null);

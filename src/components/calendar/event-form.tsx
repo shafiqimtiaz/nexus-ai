@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon, Delete02Icon } from "@hugeicons/core-free-icons";
@@ -62,28 +62,14 @@ export function EventForm({
   const queryClient = useQueryClient();
   const isEdit = event !== null;
 
-  const [title, setTitle] = useState("");
-  const [eventType, setEventType] = useState<EventType>("assignment");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [description, setDescription] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    if (event) {
-      setTitle(event.title);
-      setEventType(event.event_type);
-      setStart(isoToInput(event.start_time));
-      setEnd(isoToInput(event.end_time));
-      setDescription(event.description ?? "");
-    } else {
-      setTitle("");
-      setEventType("assignment");
-      setStart(defaultDate ? defaultStart(defaultDate) : "");
-      setEnd("");
-      setDescription("");
-    }
-  }, [open, event, defaultDate]);
+  // Mounted fresh (keyed) each time the dialog opens, so initial state comes straight from props.
+  const [title, setTitle] = useState(event?.title ?? "");
+  const [eventType, setEventType] = useState<EventType>(event?.event_type ?? "assignment");
+  const [start, setStart] = useState(() =>
+    event ? isoToInput(event.start_time) : defaultDate ? defaultStart(defaultDate) : ""
+  );
+  const [end, setEnd] = useState(() => (event ? isoToInput(event.end_time) : ""));
+  const [description, setDescription] = useState(event?.description ?? "");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["events"] });
 

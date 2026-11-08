@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +32,8 @@ export default function LoginPage() {
           },
         });
         if (authError) throw authError;
-      } catch (err: any) {
-        setError(err.message || "Failed to initiate Google sign in");
+      } catch (err) {
+        setError((err instanceof Error && err.message) || "Failed to initiate Google sign in");
         setLoading(false);
       }
     } else {
@@ -52,8 +53,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
-      <Card className="w-full max-w-sm border border-border/40 shadow-xl bg-card/60 backdrop-blur-md">
+    <div className="flex min-h-[calc(100dvh-3rem)] flex-col items-center justify-center gap-8">
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,var(--color-primary)_0%,transparent_60%)] opacity-15"
+      />
+      <div className="flex items-center gap-2.5">
+        <Image src="/nexus-icon.png" alt="" width={40} height={40} className="h-10 w-10" priority />
+        <span className="text-2xl font-semibold tracking-tight">Nexus</span>
+        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary">
+          ai
+        </span>
+      </div>
+      <Card className="w-full max-w-sm shadow-xl">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription>
@@ -105,6 +117,10 @@ export default function LoginPage() {
           </Button>
         </CardContent>
       </Card>
+      <p className="max-w-sm text-center text-xs text-muted-foreground">
+        Classroom, Discord, and Slack in one place — with an AI agent that turns announcements into
+        calendar events.
+      </p>
     </div>
   );
 }

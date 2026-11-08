@@ -175,6 +175,7 @@ export function ResourcesView({ role }: { role: Role }) {
 
       {canEdit && dialog && (
         <ResourceForm
+          key={dialog.mode === "edit" ? dialog.resource.id : "create"}
           open
           onOpenChange={(open) => {
             if (!open) setDialog(null);

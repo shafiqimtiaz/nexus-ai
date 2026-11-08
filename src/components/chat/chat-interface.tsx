@@ -1,148 +1,101 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { SentIcon, Loading03Icon, SparklesIcon, Key01Icon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { Loading03Icon, Delete02Icon } from "@hugeicons/core-free-icons";
 import type { Role } from "@/lib/auth";
-import { ToolCallDisplay, type ToolCall } from "./tool-call-display";
-import { Markdown } from "./markdown";
-
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  toolCalls: ToolCall[];
-  model?: string;
-};
-
-let idCounter = 0;
-function nextId(): string {
-  idCounter += 1;
-  return `m${idCounter}`;
-}
+import { OPEN_CHAT_EVENT, type OpenChatDetail } from "@/lib/chat-events";
+import { useHydrated } from "@/lib/use-hydrated";
+import type { ToolCall } from "./tool-call-display";
+import { readUiStream } from "./chat-stream";
+import { ChatMessageBubble, type ChatMessage } from "./chat-message";
+import { ChatComposer, CHAT_MODELS } from "./chat-composer";
+import { ChatEmptyState } from "./chat-empty-state";
+import { DemoKeyForm, MissingKeyNotice } from "./chat-key-gate";
 
 const DEMO_KEY_STORAGE = "nexus_demo_gemini_key";
+const HISTORY_STORAGE = "nexus_chat_history";
 
-async function readUiStream(
-  body: ReadableStream<Uint8Array>,
-  handlers: {
-    onTextDelta: (delta: string) => void;
-    onToolStart: (id: string, name: string) => void;
-    onToolInput: (id: string, input: unknown) => void;
-    onToolOutput: (id: string, output: unknown) => void;
-    onToolError: (id: string, errorText: string) => void;
-    onError: (errorText: string) => void;
-  }
-) {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const dispatch = (raw: string) => {
-    const payload = raw
-      .split("\n")
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).trim())
-      .join("");
-    if (!payload || payload === "[DONE]") return;
-
-    let event: Record<string, unknown>;
-    try {
-      event = JSON.parse(payload);
-    } catch {
-      return;
-    }
-
-    switch (event.type) {
-      case "text-delta":
-        handlers.onTextDelta(String(event.delta ?? ""));
-        break;
-      case "tool-input-start":
-        handlers.onToolStart(String(event.toolCallId), String(event.toolName));
-        break;
-      case "tool-input-available":
-        handlers.onToolInput(String(event.toolCallId), event.input);
-        break;
-      case "tool-output-available":
-        handlers.onToolOutput(String(event.toolCallId), event.output);
-        break;
-      case "tool-input-error":
-      case "tool-output-error":
-        handlers.onToolError(
-          String(event.toolCallId),
-          String(event.errorText ?? "Tool call failed")
-        );
-        break;
-      case "error":
-        handlers.onError(String(event.errorText ?? "Something went wrong"));
-        break;
-    }
-  };
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const block = buffer.slice(0, sep);
-      buffer = buffer.slice(sep + 2);
-      dispatch(block);
-    }
-  }
-  if (buffer.trim()) dispatch(buffer);
+function nextId(): string {
+  return crypto.randomUUID();
 }
 
-export function ChatInterface({ role, expanded = false }: { role: Role; expanded?: boolean }) {
+function loadHistory(): ChatMessage[] {
+  try {
+    const raw = sessionStorage.getItem(HISTORY_STORAGE);
+    return raw ? (JSON.parse(raw) as ChatMessage[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function ChatInterface({
+  role,
+  expanded = false,
+  autoFocus = false,
+}: {
+  role: Role;
+  expanded?: boolean;
+  autoFocus?: boolean;
+}) {
   const router = useRouter();
   const isDemo = role === "demo";
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const hydrated = useHydrated();
+  // Browser storage is read lazily; nothing that depends on it renders until `hydrated`.
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    typeof window === "undefined" ? [] : loadHistory()
+  );
+  const [demoKey, setDemoKey] = useState(() =>
+    typeof window === "undefined" ? "" : (localStorage.getItem(DEMO_KEY_STORAGE) ?? "")
+  );
+  const [ownerHasKey, setOwnerHasKey] = useState<boolean | null>(null);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [hasKey, setHasKey] = useState<boolean | null>(null);
-  const [demoKey, setDemoKey] = useState("");
-  const [demoKeyInput, setDemoKeyInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState("gemini-flash-lite-latest");
+  const [selectedModel, setSelectedModel] = useState(CHAT_MODELS[0].value);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const hasKey = !hydrated ? null : isDemo ? demoKey !== "" : ownerHasKey;
+
+  // Persist finished turns so the widget and /chat page share one conversation.
+  useEffect(() => {
+    if (busy) return;
+    sessionStorage.setItem(HISTORY_STORAGE, JSON.stringify(messages));
+  }, [messages, busy]);
 
   useEffect(() => {
-    if (isDemo) {
-      const saved = localStorage.getItem(DEMO_KEY_STORAGE) ?? "";
-      setDemoKey(saved);
-      setHasKey(saved !== "");
-      return;
-    }
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (isDemo) return;
     async function checkKey() {
       try {
         const res = await fetch("/api/platforms");
         if (!res.ok) throw new Error();
-        const data = await res.json();
-        const hasUserKey = data.platforms?.some((p: any) => p.type === "gemini" && p.is_connected);
-        setHasKey(!!data.hasGlobalGeminiKey || !!hasUserKey);
+        const data = (await res.json()) as {
+          hasGlobalGeminiKey?: boolean;
+          platforms?: { type: string; is_connected: boolean }[];
+        };
+        const hasUserKey = data.platforms?.some((p) => p.type === "gemini" && p.is_connected);
+        setOwnerHasKey(!!data.hasGlobalGeminiKey || !!hasUserKey);
       } catch {
-        setHasKey(false);
+        setOwnerHasKey(false);
       }
     }
-    checkKey();
+    void checkKey();
   }, [isDemo]);
 
   const saveDemoKey = (raw: string) => {
     const trimmed = raw.trim();
     localStorage.setItem(DEMO_KEY_STORAGE, trimmed);
     setDemoKey(trimmed);
-    setHasKey(trimmed !== "");
   };
 
   const clearDemoKey = () => {
     localStorage.removeItem(DEMO_KEY_STORAGE);
     setDemoKey("");
-    setDemoKeyInput("");
-    setHasKey(false);
   };
 
   const updateAssistant = (mutate: (m: ChatMessage) => void) => {
@@ -174,18 +127,12 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
     }
   };
 
-  async function send() {
-    const text = input.trim();
+  async function ask(text: string, prior: ChatMessage[]) {
     if (!text || busy) return;
     if (isDemo && !demoKey) return;
 
-    const userMsg: ChatMessage = {
-      id: nextId(),
-      role: "user",
-      content: text,
-      toolCalls: [],
-    };
-    const history = [...messages, userMsg];
+    const userMsg: ChatMessage = { id: nextId(), role: "user", content: text, toolCalls: [] };
+    const history = [...prior, userMsg];
     setMessages([
       ...history,
       { id: nextId(), role: "assistant", content: "", toolCalls: [], model: selectedModel },
@@ -193,12 +140,17 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
     setInput("");
     setBusy(true);
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let toolsRan = false;
+
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (isDemo && demoKey) headers["x-gemini-key"] = demoKey;
       const res = await fetch("/api/chat", {
         method: "POST",
         headers,
+        signal: controller.signal,
         body: JSON.stringify({
           messages: history.map((m) => ({ role: m.role, content: m.content })),
           model: selectedModel,
@@ -224,8 +176,10 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
         onToolStart: (id, name) => updateAssistant((m) => upsertTool(m, id, { toolName: name })),
         onToolInput: (id, inputArgs) =>
           updateAssistant((m) => upsertTool(m, id, { input: inputArgs })),
-        onToolOutput: (id, output) =>
-          updateAssistant((m) => upsertTool(m, id, { output, state: "done" })),
+        onToolOutput: (id, output) => {
+          toolsRan = true;
+          updateAssistant((m) => upsertTool(m, id, { output, state: "done" }));
+        },
         onToolError: (id, errorText) =>
           updateAssistant((m) => upsertTool(m, id, { errorText, state: "error" })),
         onError: (errorText) =>
@@ -233,45 +187,85 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
             m.content += `\n\n_Error: ${errorText}_`;
           }),
       });
-    } catch {
+    } catch (err) {
+      const aborted = err instanceof DOMException && err.name === "AbortError";
       updateAssistant((m) => {
-        m.content = m.content || "Network error — please try again.";
+        if (aborted) m.content = m.content ? `${m.content}\n\n_Stopped._` : "_Stopped._";
+        else m.content = m.content || "Network error — please try again.";
+        m.toolCalls = m.toolCalls.map((t) =>
+          t.state === "running" ? { ...t, state: "error", errorText: "Cancelled" } : t
+        );
       });
     } finally {
+      abortRef.current = null;
       setBusy(false);
+      // Tools may have created or edited events/resources — refresh server-rendered pages.
+      if (toolsRan) router.refresh();
     }
   }
 
-  return (
-    <div className="flex h-full flex-col">
-      {isDemo && hasKey && (
-        <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-          <span className="text-xs font-medium">
-            Demo mode — using your Gemini key (stored in this browser).
-          </span>
-          <button
-            type="button"
-            onClick={clearDemoKey}
-            className="shrink-0 text-xs font-semibold underline underline-offset-2 hover:opacity-80"
-          >
-            Change key
-          </button>
-        </div>
-      )}
+  const send = () => void ask(input.trim(), messages);
 
-      {!isDemo && hasKey && (
-        <div className="mb-3 flex items-center justify-between gap-4 rounded-lg border bg-card px-3 py-2 shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              AI Assistant Connected
+  const retry = () => {
+    const lastUser = messages.findLastIndex((m) => m.role === "user");
+    if (lastUser === -1) return;
+    void ask(messages[lastUser].content, messages.slice(0, lastUser));
+  };
+
+  const askRef = useRef(ask);
+  const messagesRef = useRef(messages);
+  useEffect(() => {
+    askRef.current = ask;
+    messagesRef.current = messages;
+  });
+
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const prompt = (e as CustomEvent<OpenChatDetail>).detail?.prompt;
+      if (prompt) void askRef.current(prompt, messagesRef.current);
+    };
+    window.addEventListener(OPEN_CHAT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CHAT_EVENT, onOpen);
+  }, []);
+
+  const clear = () => {
+    abortRef.current?.abort();
+    setMessages([]);
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      {hasKey && (messages.length > 0 || isDemo) && (
+        <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+          {isDemo && hasKey ? (
+            <span className="truncate text-amber-700 dark:text-amber-400">
+              Demo · using your Gemini key ·{" "}
+              <button
+                type="button"
+                onClick={clearDemoKey}
+                className="cursor-pointer font-semibold underline underline-offset-2 hover:opacity-80"
+              >
+                Change key
+              </button>
             </span>
-          </div>
+          ) : (
+            <span />
+          )}
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={clear}
+              className="flex shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <HugeiconsIcon icon={Delete02Icon} className="h-3.5 w-3.5" />
+              New chat
+            </button>
+          )}
         </div>
       )}
 
       {hasKey === null && (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-1 items-center justify-center">
           <HugeiconsIcon
             icon={Loading03Icon}
             className="h-8 w-8 animate-spin text-muted-foreground"
@@ -279,155 +273,44 @@ export function ChatInterface({ role, expanded = false }: { role: Role; expanded
         </div>
       )}
 
-      {!hasKey && hasKey !== null && isDemo && (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg bg-card shadow-sm space-y-4">
-          <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-            <HugeiconsIcon icon={Key01Icon} className="h-6 w-6" />
-          </div>
-          <div className="max-w-md space-y-2">
-            <h3 className="text-lg font-semibold tracking-tight">Add your Gemini API key</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Demo mode. Paste a Gemini API key to try the agent — it&apos;s stored only in this
-              browser and sent with your requests, never saved on the server. Get a free key at{" "}
-              <a
-                href="https://aistudio.google.com/app/apikey"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline underline-offset-2"
-              >
-                Google AI Studio
-              </a>
-              .
-            </p>
-          </div>
-          <form
-            className="flex w-full max-w-md gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveDemoKey(demoKeyInput);
-            }}
-          >
-            <Input
-              type="password"
-              value={demoKeyInput}
-              onChange={(e) => setDemoKeyInput(e.target.value)}
-              placeholder="AIza…"
-              className="h-10"
-            />
-            <Button type="submit" disabled={!demoKeyInput.trim()} className="cursor-pointer">
-              Save
-            </Button>
-          </form>
-        </div>
-      )}
-
-      {!hasKey && hasKey !== null && !isDemo && (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-dashed rounded-lg bg-card shadow-sm space-y-4">
-          <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
-            <HugeiconsIcon icon={Key01Icon} className="h-6 w-6" />
-          </div>
-          <div className="max-w-md space-y-2">
-            <h3 className="text-lg font-semibold tracking-tight">Gemini API Key Required</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              The AI Chat requires a Gemini API Key to function. Please go to the **Options** page
-              to connect Google Gemini, or configure the `GEMINI_API_KEY` environment variable on
-              your server.
-            </p>
-          </div>
-          <Button onClick={() => router.push("/options")} className="cursor-pointer">
-            Configure API Key
-          </Button>
-        </div>
-      )}
+      {hasKey === false && (isDemo ? <DemoKeyForm onSave={saveDemoKey} /> : <MissingKeyNotice />)}
 
       {hasKey && (
         <div
           ref={scrollRef}
-          className="flex-1 space-y-4 overflow-y-auto rounded-lg border bg-card p-4"
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto rounded-xl border bg-card p-4"
         >
-          {messages.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-              <HugeiconsIcon icon={SparklesIcon} className="h-8 w-8" />
-              <p className="text-sm">
-                Ask Nexus about your upcoming exams, plan a study schedule, or summarize recent
-                announcements.
-              </p>
-            </div>
+          {messages.length === 0 ? (
+            <ChatEmptyState compact={!expanded} onPick={(p) => void ask(p, messages)} />
+          ) : (
+            messages.map((m, i) => (
+              <ChatMessageBubble
+                key={m.id}
+                message={m}
+                pending={busy && i === messages.length - 1}
+                onRetry={
+                  !busy && i === messages.length - 1 && m.role === "assistant" ? retry : undefined
+                }
+              />
+            ))
           )}
-
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
-            >
-              <div
-                className={cn(
-                  "max-w-[80%] rounded-lg px-3 py-2 text-sm",
-                  m.role === "user" ? "bg-green-600 text-white" : "bg-muted text-foreground"
-                )}
-              >
-                {m.role === "assistant" &&
-                  expanded &&
-                  m.toolCalls.map((call) => <ToolCallDisplay key={call.toolCallId} call={call} />)}
-                {m.content ? (
-                  m.role === "assistant" ? (
-                    <Markdown content={m.content} />
-                  ) : (
-                    <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                  )
-                ) : m.role === "assistant" && busy ? (
-                  <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-                ) : null}
-                {m.role === "assistant" && m.model && (
-                  <div className="mt-1 text-[9px] text-muted-foreground/60 select-none text-right">
-                    {m.model}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
-      <form
-        className="mt-4 flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send();
-        }}
-      >
-        {hasKey && expanded && (
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={busy}
-            className="box-border h-10 w-44 shrink-0 cursor-pointer rounded-md border border-border bg-card px-3 text-xs font-medium text-foreground transition-colors hover:border-border-dark focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-75"
-          >
-            <option value="gemini-flash-lite-latest" className="bg-card text-foreground">
-              Gemini Lite (Default)
-            </option>
-            <option value="gemini-flash-latest" className="bg-card text-foreground">
-              Gemini Flash
-            </option>
-          </select>
-        )}
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={
-            !hasKey ? (isDemo ? "Add a Gemini key to chat" : "API Key required") : "Message Nexus…"
-          }
-          disabled={busy || !hasKey}
-          className="h-10"
-        />
-        <Button type="submit" disabled={busy || !input.trim() || !hasKey}>
-          {busy ? (
-            <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin" />
-          ) : (
-            <HugeiconsIcon icon={SentIcon} className="h-4 w-4" />
-          )}
-        </Button>
-      </form>
+      <ChatComposer
+        value={input}
+        onChange={setInput}
+        onSubmit={send}
+        onStop={() => abortRef.current?.abort()}
+        busy={busy}
+        disabled={!hasKey}
+        placeholder={
+          !hasKey ? (isDemo ? "Add a Gemini key to chat" : "API key required") : "Ask Nexus…"
+        }
+        model={selectedModel}
+        onModelChange={setSelectedModel}
+        autoFocus={autoFocus}
+      />
     </div>
   );
 }

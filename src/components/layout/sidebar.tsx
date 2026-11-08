@@ -9,6 +9,7 @@ import {
   DashboardSquare01Icon,
   Calendar03Icon,
   BookOpen01Icon,
+  AiChat02Icon,
   Settings01Icon,
   ArrowLeftDoubleIcon,
   ArrowRightDoubleIcon,
@@ -19,8 +20,11 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: DashboardSquare01Icon },
   { href: "/calendar", label: "Calendar", icon: Calendar03Icon },
   { href: "/resources", label: "Resources", icon: BookOpen01Icon },
+  { href: "/chat", label: "AI Chat", icon: AiChat02Icon },
   { href: "/options", label: "Options", icon: Settings01Icon },
 ];
+
+const COLLAPSED_STORAGE = "nexus_sidebar_collapsed";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -28,11 +32,20 @@ export function Sidebar() {
 
   useEffect(() => {
     const mql = window.matchMedia("(max-width: 768px)");
-    const sync = () => setCollapsed(mql.matches);
+    const sync = () =>
+      setCollapsed(mql.matches || localStorage.getItem(COLLAPSED_STORAGE) === "true");
     sync();
     mql.addEventListener("change", sync);
     return () => mql.removeEventListener("change", sync);
   }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      localStorage.setItem(COLLAPSED_STORAGE, String(!c));
+      return !c;
+    });
+
+  if (pathname?.startsWith("/login")) return null;
 
   return (
     <aside
@@ -67,7 +80,7 @@ export function Sidebar() {
           </div>
         )}
         <button
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={toggle}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
             "rounded-md p-1.5 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors",
@@ -91,11 +104,12 @@ export function Sidebar() {
               key={href}
               href={href}
               title={collapsed ? label : undefined}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 collapsed && "justify-center px-0",
                 active
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary/10 text-primary before:absolute before:inset-y-2 before:-left-2 before:w-1 before:rounded-r-full before:bg-primary"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
               )}
             >

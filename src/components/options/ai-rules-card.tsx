@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Loading03Icon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,12 +20,10 @@ export function AiRulesCard() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
 
-  const [rules, setRules] = useState("");
+  // null = untouched, so the textarea shows the saved rules until the user edits.
+  const [draft, setDraft] = useState<string | null>(null);
   const [showBase, setShowBase] = useState(false);
-
-  useEffect(() => {
-    if (data?.aiRules !== undefined) setRules(data.aiRules);
-  }, [data?.aiRules]);
+  const rules = draft ?? data?.aiRules ?? "";
 
   const save = useMutation({
     mutationFn: async () => {
@@ -40,7 +38,7 @@ export function AiRulesCard() {
     },
     onSuccess: () => {
       toast.success("AI rules saved.");
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["settings"] }).then(() => setDraft(null));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -88,7 +86,7 @@ export function AiRulesCard() {
             id="ai-rules"
             value={rules}
             disabled={isLoading || save.isPending}
-            onChange={(e) => setRules(e.target.value)}
+            onChange={(e) => setDraft(e.target.value)}
             rows={6}
             placeholder={
               "e.g. Always answer in a formal tone.\nWhen I ask for a study plan, spread sessions across at least 3 days.\nNever schedule anything before 9am."

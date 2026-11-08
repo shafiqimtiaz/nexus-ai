@@ -9,7 +9,7 @@ export default async function ChatPage() {
   const role = await getRole();
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-3xl flex-col space-y-4">
+    <div className="mx-auto flex h-[calc(100dvh-8rem)] max-w-3xl flex-col space-y-4">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">AI Chat</h1>
         <p className="text-sm text-muted-foreground">
@@ -19,7 +19,7 @@ export default async function ChatPage() {
       </div>
 
       <div className="min-h-0 flex-1">
-        <ChatInterface role={role} />
+        <ChatInterface role={role} expanded autoFocus />
       </div>
     </div>
   );

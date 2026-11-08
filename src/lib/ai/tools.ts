@@ -30,7 +30,7 @@ async function getPlatformTypeMap(
   db: ReturnType<typeof createServerClient>
 ): Promise<Map<string, string>> {
   const { data } = await db.from("platforms").select("id, type");
-  return new Map((data ?? []).map((p: any) => [p.id, p.type]));
+  return new Map((data ?? []).map((p) => [p.id, p.type]));
 }
 
 async function pushEventToGoogle(
@@ -82,7 +82,7 @@ export function getLocalTools(): Record<string, Tool> {
         if (error) return fail("get_upcoming_events", error.message);
 
         const platformById = await getPlatformTypeMap(db);
-        const events = (data ?? []).map((e: any) => {
+        const events = (data ?? []).map((e) => {
           const { source_platform, ...rest } = e;
           return {
             ...rest,
@@ -426,7 +426,7 @@ export function getLocalTools(): Record<string, Tool> {
         const { data, error } = await query;
         if (error) return fail("summarize_announcements", error.message);
 
-        const announcements = (data ?? []).map((a: any) => {
+        const announcements = (data ?? []).map((a) => {
           const { platform_id, ...rest } = a;
           return {
             ...rest,
@@ -453,7 +453,9 @@ export function getLocalTools(): Record<string, Tool> {
   };
 }
 
-async function performWebSearch(query: string): Promise<any[]> {
+type WebResult = { title: string; url: string; snippet: string };
+
+async function performWebSearch(query: string): Promise<WebResult[]> {
   try {
     const response = await fetch(
       `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
@@ -469,7 +471,7 @@ async function performWebSearch(query: string): Promise<any[]> {
     }
     const html = await response.text();
 
-    const results: { title: string; url: string; snippet: string }[] = [];
+    const results: WebResult[] = [];
     const titleMatches = [
       ...html.matchAll(/class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g),
     ];
@@ -480,9 +482,9 @@ async function performWebSearch(query: string): Promise<any[]> {
       const titleMatch = titleMatches[i];
       const snippetMatch = snippetMatches[i];
 
-      let rawUrl = titleMatch[1];
-      let title = titleMatch[2].replace(/<[^>]*>/g, "").trim();
-      let snippet = snippetMatch[1].replace(/<[^>]*>/g, "").trim();
+      const rawUrl = titleMatch[1];
+      const title = titleMatch[2].replace(/<[^>]*>/g, "").trim();
+      const snippet = snippetMatch[1].replace(/<[^>]*>/g, "").trim();
 
       let cleanUrl = rawUrl;
       if (rawUrl.includes("uddg=")) {

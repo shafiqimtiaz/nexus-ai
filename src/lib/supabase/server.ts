@@ -1,9 +1,13 @@
 import "server-only";
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { MockSupabaseQueryBuilder } from "./mock-db";
 
-export function createServerClient() {
+// A query builder whose chained calls are recorded and replayed once the real client is known.
+type Chainable = { [key: string | symbol]: (...args: unknown[]) => Chainable };
+
+export function createServerClient(): SupabaseClient {
   const anonKey =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
@@ -13,25 +17,25 @@ export function createServerClient() {
       from(table: string) {
         return new MockSupabaseQueryBuilder(table);
       },
-    } as any;
+    } as unknown as SupabaseClient;
   }
 
   return {
     from(table: string) {
-      const calls: { prop: string | symbol; args: any[] }[] = [];
+      const calls: { prop: string | symbol; args: unknown[] }[] = [];
 
-      const builderProxy = new Proxy({} as any, {
-        get(target, prop, receiver) {
+      const builderProxy: Chainable = new Proxy({} as Chainable, {
+        get(_target, prop) {
           // If the caller awaits the promise, resolve the client dynamically
           if (prop === "then") {
-            return (resolve: any, reject: any) => {
+            return (resolve: (value: unknown) => void, reject: (reason: unknown) => void) => {
               (async () => {
                 try {
                   const cookieStore = await cookies();
                   // Check if there is an active Supabase session cookie
                   const hasSession = cookieStore.getAll().some((c) => c.name.startsWith("sb-"));
 
-                  let client: any;
+                  let client: Chainable;
                   if (hasSession) {
                     client = createSupabaseServerClient(
                       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -50,9 +54,9 @@ export function createServerClient() {
                           },
                         },
                       }
-                    ).from(table);
+                    ).from(table) as unknown as Chainable;
                   } else {
-                    client = new MockSupabaseQueryBuilder(table);
+                    client = new MockSupabaseQueryBuilder(table) as unknown as Chainable;
                   }
 
                   // Replay all the chained method calls on the resolved client
@@ -71,7 +75,7 @@ export function createServerClient() {
           }
 
           // Otherwise, collect the method call and return the proxy again for chaining
-          return (...args: any[]) => {
+          return (...args: unknown[]) => {
             calls.push({ prop, args });
             return builderProxy;
           };
@@ -80,5 +84,5 @@ export function createServerClient() {
 
       return builderProxy;
     },
-  } as any;
+  } as unknown as SupabaseClient;
 }

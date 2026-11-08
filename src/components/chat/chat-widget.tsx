@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +13,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/lib/auth";
+import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { ChatInterface } from "./chat-interface";
 
 export function ChatWidget({ role }: { role: Role }) {
@@ -20,7 +21,28 @@ export function ChatWidget({ role }: { role: Role }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  if (pathname?.startsWith("/login")) return null;
+  const hidden = pathname?.startsWith("/login") || pathname?.startsWith("/chat");
+
+  useEffect(() => {
+    if (hidden) return;
+    const onOpen = () => setOpen(true);
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((o) => !o);
+      } else if (e.key === "Escape") {
+        setOpen(false);
+      }
+    };
+    window.addEventListener(OPEN_CHAT_EVENT, onOpen);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener(OPEN_CHAT_EVENT, onOpen);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [hidden]);
+
+  if (hidden) return null;
 
   return (
     <>
@@ -29,7 +51,8 @@ export function ChatWidget({ role }: { role: Role }) {
         <button
           onClick={() => setOpen(true)}
           aria-label="Open AI chat"
-          className="fixed bottom-6 right-8 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border transition-transform hover:scale-105 cursor-pointer"
+          title="Ask Nexus (⌘K)"
+          className="fixed bottom-6 right-6 z-40 flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-card shadow-lg ring-1 ring-border transition-transform hover:scale-105"
         >
           <Image
             src="/nexus-icon.png"
@@ -50,57 +73,56 @@ export function ChatWidget({ role }: { role: Role }) {
         />
       )}
 
-      {/* Panel */}
-      {open && (
-        <div
-          className={cn(
-            "fixed z-50 flex flex-col rounded-xl border bg-background shadow-2xl",
-            expanded
-              ? "inset-4 sm:inset-6 md:inset-10"
-              : "bottom-6 right-6 h-[600px] max-h-[calc(100vh-3rem)] w-96 max-w-[calc(100vw-3rem)]"
-          )}
-        >
-          {/* Header */}
-          <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-            <div className="flex items-center gap-2">
-              <Image src="/nexus-icon.png" alt="Nexus" width={24} height={24} className="h-6 w-6" />
-              <span className="text-sm font-semibold tracking-tight">Nexus AI</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Link
-                href="/options"
-                aria-label="Customize prompt"
-                title="Customize prompt"
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                <HugeiconsIcon icon={Settings01Icon} className="h-4 w-4" />
-              </Link>
-              <button
-                onClick={() => setExpanded((e) => !e)}
-                aria-label={expanded ? "Minimize chat" : "Expand chat"}
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                <HugeiconsIcon
-                  icon={expanded ? ArrowShrink01Icon : ArrowExpand01Icon}
-                  className="h-4 w-4"
-                />
-              </button>
-              <button
-                onClick={() => setOpen(false)}
-                aria-label="Close chat"
-                className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
-              </button>
-            </div>
+      {/* Panel — kept mounted while closed so the conversation and in-flight replies survive */}
+      <div
+        className={cn(
+          "fixed z-50 flex flex-col rounded-2xl border bg-background shadow-2xl",
+          !open && "hidden",
+          expanded
+            ? "inset-4 sm:inset-6 md:inset-10"
+            : "bottom-6 right-6 h-[600px] max-h-[calc(100vh-3rem)] w-96 max-w-[calc(100vw-3rem)]"
+        )}
+      >
+        {/* Header */}
+        <div className="flex h-14 shrink-0 items-center justify-between border-b px-4">
+          <div className="flex items-center gap-2">
+            <Image src="/nexus-icon.png" alt="Nexus" width={24} height={24} className="h-6 w-6" />
+            <span className="text-sm font-semibold tracking-tight">Nexus AI</span>
           </div>
-
-          {/* Body */}
-          <div className="min-h-0 flex-1 p-4">
-            <ChatInterface role={role} expanded={expanded} />
+          <div className="flex items-center gap-1">
+            <Link
+              href="/options"
+              aria-label="Customize prompt"
+              title="Customize prompt"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <HugeiconsIcon icon={Settings01Icon} className="h-4 w-4" />
+            </Link>
+            <button
+              onClick={() => setExpanded((e) => !e)}
+              aria-label={expanded ? "Minimize chat" : "Expand chat"}
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <HugeiconsIcon
+                icon={expanded ? ArrowShrink01Icon : ArrowExpand01Icon}
+                className="h-4 w-4"
+              />
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close chat"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
+            </button>
           </div>
         </div>
-      )}
+
+        {/* Body */}
+        <div className="min-h-0 flex-1 p-4">
+          <ChatInterface role={role} expanded={expanded} autoFocus={open} />
+        </div>
+      </div>
     </>
   );
 }

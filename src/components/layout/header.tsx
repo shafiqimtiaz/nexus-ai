@@ -1,20 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Logout01Icon, Sun03Icon, Moon02Icon } from "@hugeicons/core-free-icons";
+import { Logout01Icon, Sun03Icon, Moon02Icon, AiMagicIcon } from "@hugeicons/core-free-icons";
+import { openChat } from "@/lib/chat-events";
 import { Button } from "@/components/ui/button";
 import type { Role } from "@/lib/auth";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useHydrated } from "@/lib/use-hydrated";
 
 export function Header({ role }: { role: Role }) {
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHydrated();
+  const pathname = usePathname();
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -23,26 +22,41 @@ export function Header({ role }: { role: Role }) {
 
   const currentTheme = theme === "system" ? resolvedTheme : theme;
 
+  if (pathname?.startsWith("/login")) return null;
+
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b bg-background/80 px-4 backdrop-blur sm:px-6">
+      {!pathname?.startsWith("/chat") && (
+        <button
+          type="button"
+          onClick={() => openChat()}
+          className="hidden h-9 w-full max-w-xs cursor-pointer items-center gap-2 rounded-lg border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted md:flex"
+        >
+          <HugeiconsIcon icon={AiMagicIcon} className="h-4 w-4 text-primary" />
+          Ask Nexus anything…
+          <kbd className="ml-auto rounded border bg-background px-1.5 font-mono text-[10px]">
+            ⌘K
+          </kbd>
+        </button>
+      )}
       {role === "demo" ? (
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex min-w-0 items-center gap-2 text-sm">
           <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
             Demo mode
           </span>
-          <span className="text-muted-foreground">
-            Read-only.{" "}
+          <span className="whitespace-nowrap text-muted-foreground">
+            <span className="hidden lg:inline">Read-only. </span>
             <Link href="/login" className="font-medium text-primary hover:underline">
               Log in
-            </Link>{" "}
-            for full access.
+            </Link>
+            <span className="hidden lg:inline"> for full access.</span>
           </span>
         </div>
       ) : (
-        <span className="text-sm font-medium text-muted-foreground">Signed in</span>
+        <span className="md:hidden" />
       )}
 
-      <div className="flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-3">
         {mounted && (
           <Button
             variant="ghost"

@@ -11,23 +11,35 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AssignmentsModal } from "@/components/dashboard/assignments-modal";
 import { ExamsModal } from "@/components/dashboard/exams-modal";
 import type { DashboardData, DashboardEvent } from "@/lib/dashboard";
+import { cn } from "@/lib/utils";
+
+const TONES = {
+  red: "bg-red-500/10 text-red-600 dark:text-red-400",
+  amber: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  emerald: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+} as const;
 
 function Stat({
   icon,
   value,
   label,
+  detail,
+  tone,
   onClick,
 }: {
   icon: IconSvgElement;
   value: string;
   label: string;
+  detail?: string | null;
+  tone: keyof typeof TONES;
   onClick?: () => void;
 }) {
   return (
     <Card
-      className={
-        onClick ? "group relative cursor-pointer transition-colors hover:bg-accent/50" : undefined
-      }
+      className={cn(
+        "relative",
+        onClick && "group cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
+      )}
     >
       {onClick && (
         <button
@@ -38,7 +50,12 @@ function Stat({
         />
       )}
       <CardContent className="flex items-center gap-4">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <span
+          className={cn(
+            "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+            TONES[tone]
+          )}
+        >
           <HugeiconsIcon icon={icon} className="h-5 w-5" />
         </span>
         <div className="min-w-0">
@@ -46,6 +63,9 @@ function Stat({
             {value}
           </div>
           <div className="mt-1 truncate text-xs text-muted-foreground">{label}</div>
+          {detail && (
+            <div className="mt-0.5 truncate text-xs font-medium text-foreground/80">{detail}</div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -84,18 +104,23 @@ export function QuickStats({
                 ? "Day to next exam / quiz"
                 : "Days to next exam / quiz"
           }
+          detail={stats.nextExamTitle}
+          tone="red"
           onClick={exams.length > 0 ? () => setExamsOpen(true) : undefined}
         />
         <Stat
           icon={Notification03Icon}
           value={String(stats.unreadAnnouncements)}
           label="Unread announcements"
+          tone="amber"
           onClick={onAnnouncementsClick}
         />
         <Stat
           icon={ClipboardListIcon}
           value={String(stats.upcomingAssignments)}
           label="Upcoming assignments"
+          detail={assignments[0] ? `Next: ${assignments[0].title}` : null}
+          tone="emerald"
           onClick={assignments.length > 0 ? () => setAssignmentsOpen(true) : undefined}
         />
       </div>

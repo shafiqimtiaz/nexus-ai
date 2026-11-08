@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     if (linkErr) {
       return Response.json({ error: linkErr.message }, { status: 500 });
     }
-    const ids = (links ?? []).map((l: any) => l.resource_id as string);
+    const ids = (links ?? []).map((l) => l.resource_id as string);
     if (ids.length === 0) {
       return Response.json({ resources: [] });
     }

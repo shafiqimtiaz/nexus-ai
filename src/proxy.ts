@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 // Next 16: Simplified proxy bypass to avoid requiring Supabase keys during bootstrap.
 // Session and role gating are managed dynamically in route handlers and pages.
-export async function proxy(request: NextRequest) {
+export async function proxy() {
   return NextResponse.next();
 }
 

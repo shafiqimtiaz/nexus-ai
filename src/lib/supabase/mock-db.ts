@@ -1,204 +1,25 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { buildDemoSeed, DEMO_SEED_VERSION } from "./demo-seed";
 
 const TMP_DB_PATH = "/tmp/nexus_db.json";
-const LOCAL_DB_PATH = path.join(process.cwd(), "src/data/db.json");
 
-interface DbSchema {
-  platforms: any[];
-  events: any[];
-  announcements: any[];
-  labels: any[];
-  resources: any[];
-  resource_labels: any[];
-  agent_actions: any[];
-  app_settings: any[];
-}
+type Row = Record<string, unknown>;
+type Payload = Row | Row[];
+type DbSchema = { seed_version?: number; [table: string]: Row[] | number | undefined };
 
-function getInitialData(): DbSchema {
-  const now = new Date();
-
-  const addHours = (d: Date, h: number) => new Date(d.getTime() + h * 60 * 60 * 1000);
-  const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
-
-  return {
-    platforms: [
-      {
-        id: "11111111-1111-1111-1111-111111111111",
-        type: "google_classroom",
-        name: "CS 101 (Demo)",
-        external_id: "demo-course-cs101",
-        is_connected: true,
-        last_synced_at: now.toISOString(),
-      },
-    ],
-    events: [
-      {
-        id: "e1",
-        title: "CS 101 Midterm Exam",
-        description: "Covers chapters 1–6. Bring a calculator.",
-        event_type: "exam",
-        start_time: addDays(now, 3).toISOString(),
-        end_time: addHours(addDays(now, 3), 2).toISOString(),
-        source_platform: "11111111-1111-1111-1111-111111111111",
-        source_external_id: "demo-exam-1",
-        is_auto_detected: true,
-      },
-      {
-        id: "e2",
-        title: "Quiz 4: Recursion",
-        description: "Short quiz on recursion and stack frames.",
-        event_type: "quiz",
-        start_time: addHours(addDays(now, 1), 4).toISOString(),
-        end_time: addHours(addDays(now, 1), 5).toISOString(),
-        source_platform: "11111111-1111-1111-1111-111111111111",
-        source_external_id: "demo-quiz-4",
-        is_auto_detected: true,
-      },
-      {
-        id: "e3",
-        title: "Assignment 3: Linked Lists",
-        description: "Implement a doubly linked list with unit tests.",
-        event_type: "assignment",
-        start_time: addDays(now, 5).toISOString(),
-        end_time: addDays(now, 5).toISOString(),
-        source_platform: "11111111-1111-1111-1111-111111111111",
-        source_external_id: "demo-assign-3",
-        is_auto_detected: true,
-      },
-      {
-        id: "e4",
-        title: "Study block: Big-O review",
-        description: "Self-scheduled review session before the midterm.",
-        event_type: "study_block",
-        start_time: addHours(addDays(now, 2), 18).toISOString(),
-        end_time: addHours(addDays(now, 2), 20).toISOString(),
-        source_platform: null,
-        source_external_id: "demo-study-1",
-        is_auto_detected: false,
-      },
-    ],
-    announcements: [
-      {
-        id: "a1",
-        platform_id: "11111111-1111-1111-1111-111111111111",
-        external_id: "demo-ann-1",
-        title: "Midterm logistics",
-        content: "The midterm is in room 204. Seating chart will be posted the day before.",
-        author: "Prof. Rivera",
-        source_url: "https://classroom.google.com/demo/ann-1",
-        announced_at: addHours(now, -2).toISOString(),
-        ai_summary:
-          "📍 Midterm location: Room 204. A seating chart goes up the day before the exam.",
-      },
-      {
-        id: "a2",
-        platform_id: "11111111-1111-1111-1111-111111111111",
-        external_id: "demo-ann-2",
-        title: "Office hours moved",
-        content: "This week office hours move to Thursday 2–4pm due to a faculty meeting.",
-        author: "Prof. Rivera",
-        source_url: "https://classroom.google.com/demo/ann-2",
-        announced_at: addDays(now, -1).toISOString(),
-        ai_summary:
-          "🕑 Office hours are moved to Thursday 2–4 PM this week (faculty meeting conflict).",
-      },
-      {
-        id: "a3",
-        platform_id: "11111111-1111-1111-1111-111111111111",
-        external_id: "demo-ann-3",
-        title: "Assignment 3 posted",
-        content: "Assignment 3 (Linked Lists) is now available. Starter code is attached.",
-        author: "TA Nguyen",
-        source_url: "https://classroom.google.com/demo/ann-3",
-        announced_at: addDays(now, -2).toISOString(),
-        ai_summary:
-          "📝 Assignment 3 (Linked Lists) is live — starter code is attached. Due date in the calendar.",
-      },
-      {
-        id: "a4",
-        platform_id: "11111111-1111-1111-1111-111111111111",
-        external_id: "demo-ann-4",
-        title: "Reading for next week",
-        content: "Please read Chapter 7 (Trees) before Monday's lecture.",
-        author: "Prof. Rivera",
-        source_url: "https://classroom.google.com/demo/ann-4",
-        announced_at: addDays(now, -3).toISOString(),
-        ai_summary: "📖 Before Monday's lecture: read Chapter 7 (Trees).",
-      },
-    ],
-    labels: [
-      { id: "22222222-2222-2222-2222-222222222221", name: "Lecture Notes", color: "#059669" },
-      { id: "22222222-2222-2222-2222-222222222222", name: "Reference", color: "#0d9488" },
-    ],
-    resources: [
-      {
-        id: "r1",
-        title: "Big-O Cheat Sheet",
-        url: "https://www.bigocheatsheet.com/",
-        description: "Time/space complexity reference for common algorithms.",
-        is_pinned: true,
-        source_platform: null,
-      },
-      {
-        id: "r2",
-        title: "Lecture 5: Recursion (slides)",
-        url: "https://classroom.google.com/demo/lecture-5.pdf",
-        description: "Slides covering recursion and call stacks.",
-        is_pinned: true,
-        source_platform: "11111111-1111-1111-1111-111111111111",
-      },
-      {
-        id: "r3",
-        title: "Visualizing Data Structures",
-        url: "https://visualgo.net/",
-        description: "Interactive visualizations of common data structures.",
-        is_pinned: false,
-        source_platform: null,
-      },
-    ],
-    resource_labels: [
-      { resource_id: "r1", label_id: "22222222-2222-2222-2222-222222222222" },
-      { resource_id: "r2", label_id: "22222222-2222-2222-2222-222222222221" },
-      { resource_id: "r3", label_id: "22222222-2222-2222-2222-222222222222" },
-    ],
-    agent_actions: [
-      {
-        id: "act-1",
-        title: "Concierge Sync Run",
-        description: "Scanned Google Classroom and Discord for study events.",
-        action_type: "sync",
-        source_id: null,
-        created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-      },
-      {
-        id: "act-2",
-        title: "Autoscheduled Midterm",
-        description:
-          "Ingested CS 101 Midterm announcement and added study sessions on Google Calendar.",
-        action_type: "calendar",
-        source_id: "demo-ann-1",
-        created_at: new Date(Date.now() - 3.8 * 60 * 60 * 1000).toISOString(),
-      },
-    ],
-    app_settings: [],
-  };
-}
+const toTime = (value: unknown) => new Date(value as string).getTime();
 
 function loadDb(): DbSchema {
   if (fs.existsSync(TMP_DB_PATH)) {
     try {
-      return JSON.parse(fs.readFileSync(TMP_DB_PATH, "utf8"));
-    } catch {}
-  }
-  if (fs.existsSync(LOCAL_DB_PATH)) {
-    try {
-      return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
+      const stored = JSON.parse(fs.readFileSync(TMP_DB_PATH, "utf8"));
+      if (stored.seed_version === DEMO_SEED_VERSION) return stored;
     } catch {}
   }
 
-  const seed = getInitialData();
+  const seed = buildDemoSeed();
   saveDb(seed);
   return seed;
 }
@@ -206,7 +27,7 @@ function loadDb(): DbSchema {
 function saveDb(db: DbSchema) {
   const serialized = JSON.stringify(db, null, 2);
 
-  // write to /tmp to avoid leaking credentials to git-tracked db.json
+  // write to /tmp so local edits (and any saved credentials) never touch the repo
   try {
     const dir = path.dirname(TMP_DB_PATH);
     if (!fs.existsSync(dir)) {
@@ -216,20 +37,21 @@ function saveDb(db: DbSchema) {
   } catch {}
 }
 
-export function readTable(table: string): any[] {
+export function readTable(table: string): Row[] {
   const db = loadDb();
-  return (db as any)[table] || [];
+  const rows = db[table];
+  return Array.isArray(rows) ? rows : [];
 }
 
-export function writeTable(table: string, data: any[]) {
+export function writeTable(table: string, data: Row[]) {
   const db = loadDb();
-  (db as any)[table] = data;
+  db[table] = data;
   saveDb(db);
 }
 
 export class MockSupabaseQueryBuilder {
   private table: string;
-  private filters: ((item: any) => boolean)[] = [];
+  private filters: ((item: Row) => boolean)[] = [];
   private limitVal?: number;
   private orderCol?: string;
   private orderAsc: boolean = true;
@@ -237,30 +59,32 @@ export class MockSupabaseQueryBuilder {
   private isUpsert = false;
   private isUpdate = false;
   private isDelete = false;
-  private payload: any = null;
+  private payload: Payload | null = null;
+  private countOpts: { count?: string; head?: boolean } | null = null;
 
   constructor(table: string) {
     this.table = table;
   }
 
-  select(columns: string = "*") {
+  select(_columns?: string, options?: { count?: string; head?: boolean }) {
+    if (options?.count) this.countOpts = options;
     return this;
   }
 
-  insert(payload: any) {
+  insert(payload: Payload) {
     this.isInsert = true;
     this.payload = payload;
     return this;
   }
 
-  upsert(payload: any, options?: any) {
+  upsert(payload: Payload) {
     this.isInsert = true;
     this.isUpsert = true;
     this.payload = payload;
     return this;
   }
 
-  update(payload: any) {
+  update(payload: Row) {
     this.isUpdate = true;
     this.payload = payload;
     return this;
@@ -271,12 +95,12 @@ export class MockSupabaseQueryBuilder {
     return this;
   }
 
-  eq(column: string, value: any) {
+  eq(column: string, value: unknown) {
     this.filters.push((item) => item[column] === value);
     return this;
   }
 
-  neq(column: string, value: any) {
+  neq(column: string, value: unknown) {
     this.filters.push((item) => item[column] !== value);
     return this;
   }
@@ -289,31 +113,31 @@ export class MockSupabaseQueryBuilder {
     return this.execute(true);
   }
 
-  gte(column: string, value: any) {
+  gte(column: string, value: unknown) {
     this.filters.push((item) => {
       if (!item[column]) return false;
-      return new Date(item[column]).getTime() >= new Date(value).getTime();
+      return toTime(item[column]) >= toTime(value);
     });
     return this;
   }
 
-  lte(column: string, value: any) {
+  lte(column: string, value: unknown) {
     this.filters.push((item) => {
       if (!item[column]) return false;
-      return new Date(item[column]).getTime() <= new Date(value).getTime();
+      return toTime(item[column]) <= toTime(value);
     });
     return this;
   }
 
-  lt(column: string, value: any) {
+  lt(column: string, value: unknown) {
     this.filters.push((item) => {
       if (!item[column]) return false;
-      return new Date(item[column]).getTime() < new Date(value).getTime();
+      return toTime(item[column]) < toTime(value);
     });
     return this;
   }
 
-  in(column: string, values: any[]) {
+  in(column: string, values: unknown[]) {
     this.filters.push((item) => values.includes(item[column]));
     return this;
   }
@@ -345,13 +169,21 @@ export class MockSupabaseQueryBuilder {
     return this;
   }
 
-  async then(resolve: any, reject: any) {
+  async then(
+    resolve: (value: Awaited<ReturnType<MockSupabaseQueryBuilder["execute"]>>) => void,
+    reject?: (reason: unknown) => void
+  ) {
     try {
       const result = await this.execute();
       resolve(result);
     } catch (e) {
       if (reject) reject(e);
     }
+  }
+
+  private payloadRows(): Row[] {
+    if (!this.payload) return [];
+    return Array.isArray(this.payload) ? this.payload : [this.payload];
   }
 
   private async execute(single = false) {
@@ -367,8 +199,8 @@ export class MockSupabaseQueryBuilder {
         const valA = a[this.orderCol!];
         const valB = b[this.orderCol!];
 
-        const timeA = Date.parse(valA);
-        const timeB = Date.parse(valB);
+        const timeA = Date.parse(valA as string);
+        const timeB = Date.parse(valB as string);
 
         if (!isNaN(timeA) && !isNaN(timeB)) {
           return this.orderAsc ? timeA - timeB : timeB - timeA;
@@ -377,7 +209,9 @@ export class MockSupabaseQueryBuilder {
         if (typeof valA === "string" && typeof valB === "string") {
           return this.orderAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
-        return this.orderAsc ? valA - valB : valB - valA;
+        return this.orderAsc
+          ? (valA as number) - (valB as number)
+          : (valB as number) - (valA as number);
       });
     }
 
@@ -386,9 +220,9 @@ export class MockSupabaseQueryBuilder {
     }
 
     if (this.isUpsert) {
-      const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+      const rows = this.payloadRows();
       const currentData = [...data];
-      const insertedRows: any[] = [];
+      const insertedRows: Row[] = [];
 
       for (const row of rows) {
         let idx = -1;
@@ -400,8 +234,8 @@ export class MockSupabaseQueryBuilder {
           );
         } else if (this.table === "events") {
           // mirror live events_auto_dedup_idx to prevent duplicates
-          const normTitle = (t: string) =>
-            (t || "")
+          const normTitle = (t: unknown) =>
+            String(t ?? "")
               .replace(/[:–—].*$/, "")
               .toLowerCase()
               .replace(/\s+/g, " ")
@@ -438,7 +272,7 @@ export class MockSupabaseQueryBuilder {
     }
 
     if (this.isInsert) {
-      const rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+      const rows = this.payloadRows();
       const insertedRows = rows.map((row) => ({
         id: row.id || crypto.randomUUID(),
         created_at: new Date().toISOString(),
@@ -484,6 +318,10 @@ export class MockSupabaseQueryBuilder {
           labels: rLabels,
         };
       });
+    }
+
+    if (this.countOpts) {
+      return { data: this.countOpts.head ? null : result, count: result.length, error: null };
     }
 
     return { data: single ? (result[0] ?? null) : result, error: null };

@@ -45,7 +45,7 @@ export async function createAuthClient() {
           error: null,
         };
       },
-      async signInWithPassword({ email, password }: any) {
+      async signInWithPassword() {
         cookieStore.set("nexus_logged_in", "true", { path: "/" });
         return {
           data: {
@@ -54,7 +54,7 @@ export async function createAuthClient() {
           error: null,
         };
       },
-      async signUp({ email, password }: any) {
+      async signUp() {
         cookieStore.set("nexus_logged_in", "true", { path: "/" });
         return {
           data: {
@@ -68,5 +68,5 @@ export async function createAuthClient() {
         return { error: null };
       },
     },
-  } as any;
+  } as unknown as ReturnType<typeof createSupabaseServerClient>;
 }

@@ -1,16 +1,13 @@
 import { NextRequest } from "next/server";
 import { streamText, stepCountIs, type ModelMessage } from "ai";
-import { google, createGoogle } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import { getRole } from "@/lib/auth";
 import { getLocalTools } from "@/lib/ai/tools";
 import { getClassroomTools } from "@/lib/ai/mcp-client";
 import { buildSystemPrompt } from "@/lib/ai/system-prompt";
 import { createServerClient } from "@/lib/supabase/server";
 
-const ALLOWED_MODELS = [
-  "gemini-flash-lite-latest",
-  "gemini-flash-latest",
-];
+const ALLOWED_MODELS = ["gemini-flash-lite-latest", "gemini-flash-latest"];
 
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GEMINI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = process.env.GEMINI_API_KEY;

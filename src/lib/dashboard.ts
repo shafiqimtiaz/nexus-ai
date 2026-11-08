@@ -47,8 +47,10 @@ export type DashboardAgentAction = {
 export type DashboardData = {
   upcomingEvents: DashboardEvent[];
   todaysSchedule: DashboardEvent[];
+  weekEvents: DashboardEvent[];
   stats: {
     daysToNextExam: number | null;
+    nextExamTitle: string | null;
     unreadAnnouncements: number;
     upcomingAssignments: number;
   };
@@ -73,6 +75,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   const startToday = startOfDay(now).toISOString();
   const startTomorrow = addDays(startOfDay(now), 1).toISOString();
   const in7Days = addDays(now, 7).toISOString();
+  const in7DaysFromToday = addDays(startOfDay(now), 7).toISOString();
 
   const [
     upcomingRes,
@@ -85,6 +88,7 @@ export async function getDashboardData(): Promise<DashboardData> {
     resourcesRes,
     agentActionsRes,
     platformsRes,
+    weekRes,
   ] = await Promise.all([
     db
       .from("events")
@@ -120,11 +124,13 @@ export async function getDashboardData(): Promise<DashboardData> {
       .from("events")
       .select("id", { count: "exact", head: true })
       .eq("event_type", "assignment")
+      .gte("start_time", nowIso)
       .neq("status", "cancelled"),
     db
       .from("events")
       .select("id, title, description, event_type, start_time, end_time, source_platform")
       .eq("event_type", "assignment")
+      .gte("start_time", nowIso)
       .neq("status", "cancelled")
       .order("start_time", { ascending: true })
       .limit(20),
@@ -137,14 +143,22 @@ export async function getDashboardData(): Promise<DashboardData> {
     db
       .from("agent_actions")
       .select("id, title, description, action_type, created_at")
+      .neq("title", "Skipped stale announcement")
       .order("created_at", { ascending: false })
       .limit(5),
     db.from("platforms").select("id, name, type"),
+    db
+      .from("events")
+      .select("id, title, description, event_type, start_time, end_time, source_platform")
+      .gte("start_time", startToday)
+      .lt("start_time", in7DaysFromToday)
+      .neq("status", "cancelled")
+      .order("start_time", { ascending: true }),
   ]);
 
   // mock client doesn't support nested selects
   const platformById = new Map<string, { name: string | null; type: string | null }>(
-    (platformsRes.data ?? []).map((p: any) => [p.id, { name: p.name, type: p.type }])
+    (platformsRes.data ?? []).map((p) => [p.id, { name: p.name, type: p.type }])
   );
 
   const daysToNextExam = nextExamRes.data?.start_time
@@ -189,16 +203,18 @@ export async function getDashboardData(): Promise<DashboardData> {
   return {
     upcomingEvents: upcoming,
     todaysSchedule: (todayRes.data ?? []) as DashboardEvent[],
+    weekEvents: (weekRes.data ?? []) as DashboardEvent[],
     stats: {
       daysToNextExam,
+      nextExamTitle: nextExamRes.data?.title ?? null,
       unreadAnnouncements: unreadRes.count ?? 0,
       upcomingAssignments: assignmentsCountRes.count ?? 0,
     },
-    upcomingAssignmentEvents: (assignmentEventsRes.data ?? []).map((e: any) => ({
+    upcomingAssignmentEvents: (assignmentEventsRes.data ?? []).map((e) => ({
       ...e,
       platform: e.source_platform ? (platformById.get(e.source_platform)?.type ?? null) : null,
     })) as DashboardEvent[],
-    recentAnnouncements: (announcementsRes.data ?? []).map((a: any) => {
+    recentAnnouncements: (announcementsRes.data ?? []).map((a) => {
       const platform = platformById.get(a.platform_id);
       return {
         id: a.id,

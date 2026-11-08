@@ -79,7 +79,7 @@ src/
 │   ├── dashboard.ts      # getDashboardData() aggregates homepage data
 │   ├── auth.ts           # getRole(), requireOwner()
 │   └── auth/google-oauth.ts
-├── data/db.json          # Seed data for mock DB
+├── lib/supabase/demo-seed.ts # Date-relative seed data for the mock DB
 ├── providers.tsx          # QueryClient + ThemeProvider + Toaster
 └── proxy.ts              # Middleware (currently passthrough)
 mcp/classroom/            # In-repo Google Classroom MCP Server
